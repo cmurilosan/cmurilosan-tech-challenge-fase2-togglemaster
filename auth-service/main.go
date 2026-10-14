@@ -2,12 +2,11 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 
-	"github.com/jackc/pgx/v4/stdlib"
+	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/joho/godotenv"
 )
 
@@ -52,6 +51,7 @@ func main() {
 	// --- Rotas da API ---
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", app.healthHandler)
+	mux.HandleFunc("/ready", app.readyHandler)
 
 	// Endpoint público para validar uma chave
 	mux.HandleFunc("/validate", app.validateKeyHandler)

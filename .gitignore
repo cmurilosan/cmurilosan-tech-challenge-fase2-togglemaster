@@ -1,0 +1,23 @@
+# Variaveis de ambiente locais (nunca versionar segredos)
+.env
+*/.env
+
+# Build artifacts
+bin/
+dist/
+*.exe
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Credenciais
+*.pem

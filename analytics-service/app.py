@@ -28,11 +28,19 @@ if not all([AWS_REGION, SQS_QUEUE_URL, DYNAMODB_TABLE_NAME]):
 
 # --- Clientes Boto3 ---
 # Criamos a sessão uma vez
+# Endpoints customizados permitem apontar para o SQS/DynamoDB locais do
+# docker-compose (ElasticMQ e DynamoDB Local). Em produção ficam vazios e o
+# boto3 usa os endpoints padrão da AWS.
+SQS_ENDPOINT_URL = os.getenv("AWS_SQS_ENDPOINT") or None
+DYNAMODB_ENDPOINT_URL = os.getenv("AWS_DYNAMODB_ENDPOINT") or None
+
 try:
     session = boto3.Session(region_name=AWS_REGION)
-    sqs_client = session.client("sqs")
-    dynamodb_client = session.client("dynamodb")
+    sqs_client = session.client("sqs", endpoint_url=SQS_ENDPOINT_URL)
+    dynamodb_client = session.client("dynamodb", endpoint_url=DYNAMODB_ENDPOINT_URL)
     log.info(f"Clientes Boto3 inicializados na região {AWS_REGION}")
+    if SQS_ENDPOINT_URL or DYNAMODB_ENDPOINT_URL:
+        log.info(f"Endpoints locais -> SQS: {SQS_ENDPOINT_URL}, DynamoDB: {DYNAMODB_ENDPOINT_URL}")
 except NoCredentialsError:
     log.critical("Credenciais da AWS não encontradas. Verifique seu ambiente.")
     sys.exit(1)
@@ -85,6 +93,31 @@ def process_message(message):
         log.error(f"Erro inesperado ao processar {message['MessageId']}: {e}")
         # Não deleta a mensagem, tenta novamente
 
+# --- Estado de saude do worker ---
+# O worker roda em thread de background, entao o Flask responderia 200 mesmo
+# com a thread morta. Estas variaveis expoem o estado real para as probes.
+_worker_thread = None
+_worker_state_lock = threading.Lock()
+_last_successful_poll = None
+
+# O long-polling espera ate 20s por mensagens, logo um poll bem-sucedido deve
+# ocorrer a cada ~20s. 90s da folga para os retries de 10s do loop.
+POLL_STALE_AFTER_SECONDS = 90
+
+
+def _mark_poll_ok():
+    global _last_successful_poll
+    with _worker_state_lock:
+        _last_successful_poll = time.monotonic()
+
+
+def _seconds_since_last_poll():
+    with _worker_state_lock:
+        if _last_successful_poll is None:
+            return None
+        return time.monotonic() - _last_successful_poll
+
+
 def sqs_worker_loop():
     """ Loop principal do worker que ouve a fila SQS """
     log.info("Iniciando o worker SQS...")
@@ -96,6 +129,7 @@ def sqs_worker_loop():
                 MaxNumberOfMessages=10,  # Processa em lotes de até 10
                 WaitTimeSeconds=20
             )
+            _mark_poll_ok()
             
             messages = response.get('Messages', [])
             if not messages:
@@ -120,15 +154,44 @@ app = Flask(__name__)
 
 @app.route('/health')
 def health():
-    # Uma verificação de saúde real poderia checar a conexão com o DynamoDB/SQS
+    # Liveness: a thread do worker esta viva? Este servico nao expoe rota de
+    # negocio, so o worker -- se a thread morreu, o processo e inutil mesmo
+    # respondendo HTTP, e reiniciar o container e exatamente o que resolve.
+    # Nao checa SQS/DynamoDB de proposito: dependencia externa fora do ar nao
+    # se resolve com restart e derrubaria todas as replicas de uma vez.
+    if _worker_thread is None or not _worker_thread.is_alive():
+        log.error("Liveness falhou: a thread do worker SQS nao esta viva")
+        return jsonify({"status": "unhealthy", "reason": "worker sqs morto"}), 503
     return jsonify({"status": "ok"})
+
+
+@app.route('/ready')
+def ready():
+    # Readiness: worker vivo E conseguindo falar com o SQS. Falhar aqui nao
+    # reinicia o pod, so sinaliza que ele nao esta processando a fila.
+    if _worker_thread is None or not _worker_thread.is_alive():
+        return jsonify({"status": "not ready", "reason": "worker sqs morto"}), 503
+
+    idle = _seconds_since_last_poll()
+    if idle is None:
+        return jsonify({"status": "not ready", "reason": "primeiro poll pendente"}), 503
+    if idle > POLL_STALE_AFTER_SECONDS:
+        log.warning(f"Readiness falhou: sem poll bem-sucedido ha {int(idle)}s")
+        return jsonify({
+            "status": "not ready",
+            "reason": f"sem poll bem-sucedido ha {int(idle)}s",
+        }), 503
+
+    return jsonify({"status": "ready", "last_poll_seconds_ago": int(idle)})
 
 # --- Inicialização ---
 
 def start_worker():
     """ Inicia o worker SQS em uma thread separada """
+    global _worker_thread
     worker_thread = threading.Thread(target=sqs_worker_loop, daemon=True)
     worker_thread.start()
+    _worker_thread = worker_thread
 
 # Inicia o worker SQS em uma thread de background
 # Isso garante que ele inicie tanto com 'flask run' quanto com 'gunicorn'

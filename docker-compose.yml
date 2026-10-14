@@ -1,0 +1,245 @@
+# ToggleMaster - ambiente local completo (Tech Challenge Fase 2, etapa 1).
+#
+# Sobe os 5 microsservicos + os 4 bancos locais exigidos pelo desafio
+# (2x PostgreSQL, 1x Redis, 1x DynamoDB Local) e mais dois auxiliares que
+# tornam o fluxo ponta a ponta demonstravel offline:
+#   - elasticmq      : fila compativel com a API do SQS, rodando localmente
+#   - dynamodb-init  : job efemero que cria a tabela ToggleMasterAnalytics
+#
+# Uso:  cp .env.example .env  &&  docker compose up -d --build
+
+name: togglemaster
+
+x-aws-local: &aws-local
+  AWS_REGION: ${AWS_REGION:-us-east-1}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
+
+services:
+  # ------------------------------------------------------------------ dados
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: tm-postgres-auth
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-togglemaster}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-togglemaster}
+      POSTGRES_DB: auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+      - ./auth-service/db/init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./infra/postgres/auth-02-seed-dev-key.sql:/docker-entrypoint-initdb.d/02-seed-dev-key.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-togglemaster} -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  postgres-core:
+    image: postgres:16-alpine
+    container_name: tm-postgres-core
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-togglemaster}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-togglemaster}
+      POSTGRES_DB: flags_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-core-data:/var/lib/postgresql/data
+      - ./flag-service/db/init.sql:/docker-entrypoint-initdb.d/01-schema-flags.sql:ro
+      - ./infra/postgres/core-02-targeting.sh:/docker-entrypoint-initdb.d/02-targeting.sh:ro
+      - ./targeting-service/db/init.sql:/schemas/targeting.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-togglemaster} -d flags_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: tm-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  dynamodb-local:
+    image: amazon/dynamodb-local:2.5.2
+    container_name: tm-dynamodb
+    user: root
+    working_dir: /home/dynamodblocal
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-dbPath", "./data"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - dynamodb-data:/home/dynamodblocal/data
+    restart: unless-stopped
+
+  elasticmq:
+    image: softwaremill/elasticmq-native:1.6.11
+    container_name: tm-elasticmq
+    ports:
+      - "9324:9324"
+    volumes:
+      - ./infra/elasticmq/elasticmq.conf:/opt/elasticmq.conf:ro
+    restart: unless-stopped
+
+  # ----------------------------------------------------- bootstrap efemero
+  dynamodb-init:
+    image: amazon/aws-cli:2.17.0
+    container_name: tm-dynamodb-init
+    depends_on:
+      dynamodb-local:
+        condition: service_started
+    environment:
+      <<: *aws-local
+      AWS_DYNAMODB_TABLE: ${AWS_DYNAMODB_TABLE:-ToggleMasterAnalytics}
+      AWS_DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+    volumes:
+      - ./infra/dynamodb/create-table.sh:/scripts/create-table.sh:ro
+    entrypoint: ["/bin/sh", "/scripts/create-table.sh"]
+    restart: "no"
+
+  # ----------------------------------------------------------- aplicacoes
+  auth-service:
+    build:
+      context: ./auth-service
+    image: togglemaster/auth-service:local
+    container_name: tm-auth-service
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    environment:
+      PORT: "8001"
+      DATABASE_URL: postgres://${POSTGRES_USER:-togglemaster}:${POSTGRES_PASSWORD:-togglemaster}@postgres-auth:5432/auth_db?sslmode=disable
+      MASTER_KEY: ${MASTER_KEY:-admin-secreto-123}
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8001/ready >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  flag-service:
+    build:
+      context: ./flag-service
+    image: togglemaster/flag-service:local
+    container_name: tm-flag-service
+    depends_on:
+      postgres-core:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    environment:
+      PORT: "8002"
+      DATABASE_URL: postgres://${POSTGRES_USER:-togglemaster}:${POSTGRES_PASSWORD:-togglemaster}@postgres-core:5432/flags_db?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-service:8001
+    ports:
+      - "8002:8002"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8002/ready >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  targeting-service:
+    build:
+      context: ./targeting-service
+    image: togglemaster/targeting-service:local
+    container_name: tm-targeting-service
+    depends_on:
+      postgres-core:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    environment:
+      PORT: "8003"
+      DATABASE_URL: postgres://${POSTGRES_USER:-togglemaster}:${POSTGRES_PASSWORD:-togglemaster}@postgres-core:5432/targeting_db?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-service:8001
+    ports:
+      - "8003:8003"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8003/ready >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  evaluation-service:
+    build:
+      context: ./evaluation-service
+    image: togglemaster/evaluation-service:local
+    container_name: tm-evaluation-service
+    depends_on:
+      redis:
+        condition: service_healthy
+      flag-service:
+        condition: service_healthy
+      targeting-service:
+        condition: service_healthy
+      elasticmq:
+        condition: service_started
+    environment:
+      <<: *aws-local
+      PORT: "8004"
+      REDIS_URL: redis://redis:6379
+      FLAG_SERVICE_URL: http://flag-service:8002
+      TARGETING_SERVICE_URL: http://targeting-service:8003
+      SERVICE_API_KEY: ${SERVICE_API_KEY:-tm_key_local_dev_0000000000000000}
+      AWS_SQS_URL: ${AWS_SQS_URL:-http://elasticmq:9324/queue/togglemaster-events}
+      AWS_SQS_ENDPOINT: ${AWS_SQS_ENDPOINT:-http://elasticmq:9324}
+    ports:
+      - "8004:8004"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8004/ready >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  analytics-service:
+    build:
+      context: ./analytics-service
+    image: togglemaster/analytics-service:local
+    container_name: tm-analytics-service
+    depends_on:
+      elasticmq:
+        condition: service_started
+      dynamodb-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *aws-local
+      PORT: "8005"
+      AWS_SQS_URL: ${AWS_SQS_URL:-http://elasticmq:9324/queue/togglemaster-events}
+      AWS_SQS_ENDPOINT: ${AWS_SQS_ENDPOINT:-http://elasticmq:9324}
+      AWS_DYNAMODB_TABLE: ${AWS_DYNAMODB_TABLE:-ToggleMasterAnalytics}
+      AWS_DYNAMODB_ENDPOINT: ${AWS_DYNAMODB_ENDPOINT:-http://dynamodb-local:8000}
+    ports:
+      - "8005:8005"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8005/ready >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres-auth-data:
+  postgres-core-data:
+  dynamodb-data:

@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 )
@@ -16,6 +17,11 @@ import (
 const (
 	// Tempo de vida do cache em segundos
 	CACHE_TTL = 30 * time.Second
+
+	// Prazo maximo de cada operacao no Redis. O cache e um otimizador, nao a
+	// fonte da verdade: se ele nao responde rapido, seguir para os
+	// microsservicos e mais barato do que esperar.
+	CACHE_OP_TIMEOUT = 500 * time.Millisecond
 )
 
 // getDecision é o wrapper principal
@@ -34,8 +40,11 @@ func (a *App) getDecision(userID, flagName string) (bool, error) {
 func (a *App) getCombinedFlagInfo(flagName string) (*CombinedFlagInfo, error) {
 	cacheKey := fmt.Sprintf("flag_info:%s", flagName)
 
-	// 1. Tentar buscar do Cache (Redis)
-	val, err := a.RedisClient.Get(ctx, cacheKey).Result()
+	// 1. Tentar buscar do Cache (Redis), com prazo para nao pendurar a
+	// requisicao caso o Redis esteja indisponivel
+	getCtx, cancelGet := context.WithTimeout(ctx, CACHE_OP_TIMEOUT)
+	val, err := a.RedisClient.Get(getCtx, cacheKey).Result()
+	cancelGet()
 	if err == nil {
 		// Cache HIT
 		var info CombinedFlagInfo
@@ -57,7 +66,9 @@ func (a *App) getCombinedFlagInfo(flagName string) (*CombinedFlagInfo, error) {
 	// 3. Salvar no Cache
 	jsonData, err := json.Marshal(info)
 	if err == nil {
-		a.RedisClient.Set(ctx, cacheKey, jsonData, CACHE_TTL).Err()
+		setCtx, cancelSet := context.WithTimeout(ctx, CACHE_OP_TIMEOUT)
+		a.RedisClient.Set(setCtx, cacheKey, jsonData, CACHE_TTL).Err()
+		cancelSet()
 	}
 
 	return info, nil

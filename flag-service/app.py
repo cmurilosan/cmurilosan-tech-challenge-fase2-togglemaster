@@ -68,7 +68,29 @@ def require_auth(f):
 
 @app.route('/health')
 def health():
+    # Liveness: apenas confirma que o processo responde. Nao toca em dependencia
+    # externa de proposito -- se o Postgres cair, reiniciar o pod nao resolve e
+    # derrubaria todas as replicas ao mesmo tempo.
     return jsonify({"status": "ok"})
+
+@app.route('/ready')
+def ready():
+    # Readiness: checa a dependencia real. Falhar aqui tira o pod do Service
+    # (para de receber trafego) sem reiniciar o container.
+    conn = None
+    cur = None
+    try:
+        conn = pool.getconn()
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.fetchone()
+        return jsonify({"status": "ready"})
+    except Exception as e:
+        log.warning(f"Readiness falhou: {e}")
+        return jsonify({"status": "not ready", "reason": "postgres indisponivel"}), 503
+    finally:
+        if cur: cur.close()
+        if conn: pool.putconn(conn)
 
 @app.route('/flags', methods=['POST'])
 @require_auth

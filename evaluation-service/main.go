@@ -68,6 +68,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Não foi possível parsear a URL do Redis: %v", err)
 	}
+	// Timeouts explicitos. Sem eles valem os defaults do go-redis (DialTimeout
+	// de 5s x MaxRetries 3), que fazem uma requisicao esperar ~15s quando o
+	// Redis esta fora do ar em vez de cair rapido no fallback dos servicos.
+	opt.DialTimeout = 1 * time.Second
+	opt.ReadTimeout = 500 * time.Millisecond
+	opt.WriteTimeout = 500 * time.Millisecond
+	opt.MaxRetries = 1
+
 	rdb := redis.NewClient(opt)
 	if _, err := rdb.Ping(ctx).Result(); err != nil {
 		log.Fatalf("Não foi possível conectar ao Redis: %v", err)
@@ -77,7 +85,15 @@ func main() {
 	// Cliente SQS (AWS SDK)
 	var sqsSvc *sqs.SQS
 	if sqsQueueURL != "" {
-		sess, err := session.NewSession(&aws.Config{Region: aws.String(awsRegion)})
+		awsCfg := &aws.Config{Region: aws.String(awsRegion)}
+		// Endpoint customizado para o SQS local (ElasticMQ) no docker-compose.
+		// Em produção (AWS real) a variável fica vazia e o SDK usa o endpoint padrão.
+		if endpoint := os.Getenv("AWS_SQS_ENDPOINT"); endpoint != "" {
+			awsCfg.Endpoint = aws.String(endpoint)
+			log.Printf("Usando endpoint SQS customizado: %s", endpoint)
+		}
+
+		sess, err := session.NewSession(awsCfg)
 		if err != nil {
 			log.Fatalf("Não foi possível criar sessão AWS: %v", err)
 		}
@@ -103,6 +119,7 @@ func main() {
 	// --- Rotas ---
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", app.healthHandler)
+	mux.HandleFunc("/ready", app.readyHandler)
 	mux.HandleFunc("/evaluate", app.evaluationHandler)
 
 	log.Printf("Serviço de Avaliação (Go) rodando na porta %s", port)

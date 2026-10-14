@@ -1,12 +1,12 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // Estrutura para o corpo da requisição de criação de chave
@@ -21,10 +21,35 @@ type CreateKeyResponse struct {
 	Message string `json:"message"`
 }
 
-// healthHandler é um simples endpoint de verificação de saúde
+// healthHandler serve de liveness probe: confirma apenas que o processo
+// responde. Nao toca no banco de proposito -- se o Postgres cair, reiniciar o
+// container nao resolve e derrubaria todas as replicas ao mesmo tempo.
 func (a *App) healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// readyHandler serve de readiness probe: checa a dependencia real. Falhar aqui
+// remove o pod do Service (para de receber trafego) sem reiniciar o container.
+func (a *App) readyHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	if err := a.DB.PingContext(ctx); err != nil {
+		log.Printf("Readiness falhou: %v", err)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "not ready",
+			"reason": "postgres indisponivel",
+		})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
 }
 
 // validateKeyHandler verifica se uma chave de API (enviada via Header) é válida

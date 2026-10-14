@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 )
 
 type EvaluationResponse struct {
@@ -12,10 +14,37 @@ type EvaluationResponse struct {
 	Result   bool   `json:"result"`
 }
 
+// healthHandler serve de liveness probe: confirma apenas que o processo
+// responde. Nao toca em dependencia externa de proposito -- restart nao
+// resolve Redis fora do ar e derrubaria todas as replicas de uma vez.
 func (a *App) healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// readyHandler serve de readiness probe. Checa so o Redis, que e a dependencia
+// propria deste servico. O flag-service e o targeting-service ficam de fora de
+// proposito: encadear readiness em dependencia de servico multiplica as
+// indisponibilidades e uma falha neles tiraria este pod do ar junto.
+func (a *App) readyHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	reqCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	if err := a.RedisClient.Ping(reqCtx).Err(); err != nil {
+		log.Printf("Readiness falhou: %v", err)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "not ready",
+			"reason": "redis indisponivel",
+		})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
 }
 
 func (a *App) evaluationHandler(w http.ResponseWriter, r *http.Request) {
