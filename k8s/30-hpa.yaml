@@ -1,0 +1,93 @@
+# Etapa 5 - HPA por CPU dos dois servicos que recebem carga variavel.
+#
+# Por que estes dois: o /evaluate e o caminho quente (CPU sobe direto com o
+# volume de requisicoes) e cada avaliacao publica um evento no SQS, o que faz
+# o analytics-service escalar em cascata ao consumir o backlog. Uma unica
+# rajada de carga demonstra os dois HPAs.
+#
+# A metrica vem do Metrics Server instalado na etapa 3; sem ele o HPA fica com
+# `<unknown>` em TARGETS.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: evaluation-service
+  namespace: togglemaster
+  labels:
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: evaluation-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          # 60% de requests.cpu=100m => escala acima de ~60m por pod.
+          averageUtilization: 60
+  behavior:
+    scaleUp:
+      # Sem janela de estabilizacao: reage na primeira leitura acima do alvo.
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      # 120s em vez dos 300s default: encurta o scale in o suficiente para
+      # caber na demonstracao em video sem ficar instavel.
+      stabilizationWindowSeconds: 120
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 30
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: analytics-service
+  namespace: togglemaster
+  labels:
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: analytics-service
+  minReplicas: 1
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          # 60% de requests.cpu=50m => escala acima de ~30m por pod. Com a fila
+          # vazia o worker dorme no long poll e a CPU fica perto de zero; com
+          # backlog ele processa em lotes de 10 e passa do alvo.
+          averageUtilization: 60
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 120
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 30

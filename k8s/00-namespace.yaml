@@ -1,0 +1,8 @@
+# Etapa 4 - Namespace que isola todos os objetos da aplicacao.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: togglemaster
+  labels:
+    app.kubernetes.io/part-of: togglemaster
+    name: togglemaster

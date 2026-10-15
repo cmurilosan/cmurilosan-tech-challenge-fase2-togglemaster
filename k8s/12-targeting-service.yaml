@@ -1,0 +1,103 @@
+# Etapa 4 - targeting-service (Python/Flask): regras de segmentacao por flag. Depende
+# do RDS targeting_db e do auth-service para validar a chave de API.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: targeting-service
+  namespace: togglemaster
+  labels:
+    app: targeting-service
+    app.kubernetes.io/name: targeting-service
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: targeting-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: targeting-service
+        app.kubernetes.io/name: targeting-service
+        app.kubernetes.io/part-of: togglemaster
+    spec:
+      securityContext:
+        # runAsUser explicito e obrigatorio aqui: os Dockerfiles declaram
+        # `USER appuser` (nome, nao numero) e, sem o UID numerico, o kubelet
+        # nao consegue provar que o usuario nao e root -- o pod falharia com
+        # "image has non-numeric user (appuser), cannot verify user is
+        # non-root". 10001 e o UID criado nas 5 imagens.
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: targeting-service
+          # TROQUE os 12 digitos pelo ID da sua conta AWS.
+          # Obter com: aws sts get-caller-identity --query Account --output text
+          image: "TROQUE-ACCOUNT-ID.dkr.ecr.us-east-1.amazonaws.com/togglemaster/targeting-service:v1"
+          # Always, e nao IfNotPresent: durante a sessao do lab e comum
+          # republicar a MESMA tag depois de um ajuste, e com IfNotPresent os
+          # nos continuariam servindo a imagem antiga em cache.
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8003
+          env:
+            - name: PORT
+              value: "8003"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: togglemaster-secrets
+                  key: DATABASE_URL_TARGETING
+            - name: AUTH_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: AUTH_SERVICE_URL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          startupProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: targeting-service
+  namespace: togglemaster
+  labels:
+    app: targeting-service
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  type: ClusterIP
+  selector:
+    app: targeting-service
+  ports:
+    - name: http
+      port: 8003
+      targetPort: http

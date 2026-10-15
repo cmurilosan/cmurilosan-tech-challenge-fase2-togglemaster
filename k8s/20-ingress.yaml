@@ -1,0 +1,63 @@
+# Etapa 4 - Ingress unico que publica a API pelo Nginx Ingress Controller
+# instalado na etapa 3.
+#
+# Sem `host:` de proposito: o controller e exposto por um Service LoadBalancer
+# e o DNS do ELB so e conhecido depois do provisionamento. Assim o Ingress
+# responde em qualquer host, inclusive no DNS do proprio ELB, o que e o que se
+# usa na demonstracao. Para um dominio proprio, basta adicionar `host:` na
+# regra.
+#
+# O analytics-service nao tem rota aqui: ele e um worker de fila, sem API
+# publica. Ele e alcancavel internamente pelo Service ClusterIP.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: togglemaster
+  namespace: togglemaster
+  labels:
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # Caminho quente: avaliacao de flag por usuario.
+          - path: /evaluate
+            pathType: Prefix
+            backend:
+              service:
+                name: evaluation-service
+                port:
+                  number: 8004
+          # CRUD de flags (/flags e /flags/<nome>).
+          - path: /flags
+            pathType: Prefix
+            backend:
+              service:
+                name: flag-service
+                port:
+                  number: 8002
+          # Regras de segmentacao (/rules e /rules/<flag>).
+          - path: /rules
+            pathType: Prefix
+            backend:
+              service:
+                name: targeting-service
+                port:
+                  number: 8003
+          # Validacao de chave de API (uso interno, exposto para depuracao).
+          - path: /validate
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 8001
+          # Emissao de chaves de API, protegida pela MASTER_KEY.
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 8001

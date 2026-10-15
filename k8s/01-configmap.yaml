@@ -1,0 +1,44 @@
+# Etapa 4 - Configuracao nao sensivel, compartilhada pelos 5 servicos.
+#
+# EDITAR ANTES DE APLICAR: as duas linhas marcadas com TROQUE abaixo.
+# Os demais valores nao mudam.
+#
+# Os nomes de host dos Services (auth-service, flag-service, targeting-service)
+# sao resolvidos pelo CoreDNS dentro do namespace, entao as URLs de comunicacao
+# entre servicos sao as mesmas do docker-compose -- nenhuma mudanca de codigo.
+#
+# AWS_SQS_ENDPOINT e AWS_DYNAMODB_ENDPOINT ficam VAZIOS de proposito: vazio
+# significa "use o endpoint real da AWS". No compose eles apontam para o
+# ElasticMQ e o DynamoDB Local.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: togglemaster-config
+  namespace: togglemaster
+  labels:
+    app.kubernetes.io/part-of: togglemaster
+data:
+  # ------------------------------------------------------------------- AWS
+  AWS_REGION: "us-east-1"
+  AWS_DYNAMODB_TABLE: "ToggleMasterAnalytics"
+
+  # TROQUE pela URL da fila SQS criada na etapa 2.
+  # Obter com: aws sqs get-queue-url --queue-name togglemaster-events
+  AWS_SQS_URL: "TROQUE-PELA-URL-DA-FILA-SQS"
+
+  # Vazios = AWS real (no compose apontam para os emuladores locais).
+  AWS_SQS_ENDPOINT: ""
+  AWS_DYNAMODB_ENDPOINT: ""
+
+  # --------------------------------------------------------------- ElastiCache
+  # TROQUE pelo primary endpoint do Redis (so o host, a porta ja esta ai).
+  # Obter com: aws elasticache describe-cache-clusters \
+  #   --cache-cluster-id togglemaster-redis --show-cache-node-info \
+  #   --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text
+  REDIS_URL: "redis://TROQUE-PELO-ENDPOINT-DO-ELASTICACHE:6379"
+
+  # ------------------------------------------------- comunicacao entre servicos
+  # Nao mexer: sao os nomes dos Services K8s, resolvidos pelo DNS do cluster.
+  AUTH_SERVICE_URL: "http://auth-service:8001"
+  FLAG_SERVICE_URL: "http://flag-service:8002"
+  TARGETING_SERVICE_URL: "http://targeting-service:8003"

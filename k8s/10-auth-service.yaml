@@ -1,0 +1,108 @@
+# Etapa 4 - auth-service (Go): emite e valida chaves de API. Depende do RDS auth_db.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: togglemaster
+  labels:
+    app: auth-service
+    app.kubernetes.io/name: auth-service
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: auth-service
+        app.kubernetes.io/name: auth-service
+        app.kubernetes.io/part-of: togglemaster
+    spec:
+      securityContext:
+        # runAsUser explicito e obrigatorio aqui: os Dockerfiles declaram
+        # `USER appuser` (nome, nao numero) e, sem o UID numerico, o kubelet
+        # nao consegue provar que o usuario nao e root -- o pod falharia com
+        # "image has non-numeric user (appuser), cannot verify user is
+        # non-root". 10001 e o UID criado nas 5 imagens.
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: auth-service
+          # TROQUE os 12 digitos pelo ID da sua conta AWS.
+          # Obter com: aws sts get-caller-identity --query Account --output text
+          image: "TROQUE-ACCOUNT-ID.dkr.ecr.us-east-1.amazonaws.com/togglemaster/auth-service:v1"
+          # Always, e nao IfNotPresent: durante a sessao do lab e comum
+          # republicar a MESMA tag depois de um ajuste, e com IfNotPresent os
+          # nos continuariam servindo a imagem antiga em cache.
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8001
+          env:
+            - name: PORT
+              value: "8001"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: togglemaster-secrets
+                  key: DATABASE_URL_AUTH
+            - name: MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: togglemaster-secrets
+                  key: MASTER_KEY
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 300m
+              memory: 128Mi
+          # startupProbe cobre a partida (conexao inicial com o RDS); enquanto
+          # ela nao passa, liveness e readiness ficam suspensas.
+          startupProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 3
+            failureThreshold: 20
+          # Liveness: processo de pe. Estatica de proposito - nao checa o banco,
+          # porque reiniciar o pod nao conserta um RDS fora do ar.
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Readiness: o banco esta alcancavel? Se nao, sai do balanceamento
+          # sem reiniciar.
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: togglemaster
+  labels:
+    app: auth-service
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  type: ClusterIP
+  selector:
+    app: auth-service
+  ports:
+    - name: http
+      port: 8001
+      targetPort: http

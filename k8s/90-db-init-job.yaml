@@ -1,0 +1,83 @@
+# Etapa 2 (apoio) - Job efemero que aplica o schema nas 3 instancias RDS.
+#
+# As instancias RDS nao sao publicas, entao o schema e aplicado de dentro do
+# cluster, que ja esta na mesma VPC. Evita bastion host e e repetivel no video.
+#
+# Depende de um ConfigMap com os .sql, criado a partir dos arquivos do repo
+# (fonte unica da verdade - o mesmo schema que o compose usa):
+#
+#   kubectl -n togglemaster create configmap togglemaster-db-schemas \
+#       --from-file=auth.sql=auth-service/db/init.sql \
+#       --from-file=flags.sql=flag-service/db/init.sql \
+#       --from-file=targeting.sql=targeting-service/db/init.sql
+#   kubectl apply -f k8s/rendered/90-db-init-job.yaml
+#   kubectl -n togglemaster logs job/db-init
+#
+# Nao semeia chave de API: em producao a chave e emitida de verdade pelo
+# auth-service (POST /admin/keys) com a MASTER_KEY.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+  namespace: togglemaster
+  labels:
+    app.kubernetes.io/name: db-init
+    app.kubernetes.io/component: bootstrap
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: db-init
+        app.kubernetes.io/part-of: togglemaster
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: psql
+          image: postgres:16-alpine
+          env:
+            - name: DATABASE_URL_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: togglemaster-secrets
+                  key: DATABASE_URL_AUTH
+            - name: DATABASE_URL_FLAGS
+              valueFrom:
+                secretKeyRef:
+                  name: togglemaster-secrets
+                  key: DATABASE_URL_FLAGS
+            - name: DATABASE_URL_TARGETING
+              valueFrom:
+                secretKeyRef:
+                  name: togglemaster-secrets
+                  key: DATABASE_URL_TARGETING
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              # Os schemas usam CREATE TABLE IF NOT EXISTS, entao rodar de novo
+              # e inofensivo.
+              echo "==> auth_db"
+              psql -v ON_ERROR_STOP=1 "$DATABASE_URL_AUTH" -f /schemas/auth.sql
+              echo "==> flags_db"
+              psql -v ON_ERROR_STOP=1 "$DATABASE_URL_FLAGS" -f /schemas/flags.sql
+              echo "==> targeting_db"
+              psql -v ON_ERROR_STOP=1 "$DATABASE_URL_TARGETING" -f /schemas/targeting.sql
+              echo "schemas aplicados nas 3 instancias."
+          volumeMounts:
+            - name: schemas
+              mountPath: /schemas
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 192Mi
+      volumes:
+        - name: schemas
+          configMap:
+            name: togglemaster-db-schemas

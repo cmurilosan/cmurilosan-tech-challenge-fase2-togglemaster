@@ -1,0 +1,66 @@
+# Etapa 5 (apoio) - Gerador de carga para demonstrar o HPA. NAO faz parte da
+# aplicacao: e a ferramenta que produz a rajada no /evaluate durante o video.
+#
+# Sobe com replicas: 0 para que o `kubectl apply -f k8s/` nao comece a gerar
+# carga sozinho. Para ligar e desligar na demonstracao:
+#
+#   kubectl -n togglemaster scale deploy/loadgen --replicas=3   # liga
+#   kubectl -n togglemaster scale deploy/loadgen --replicas=0   # desliga
+#
+# Cada pod roda CONCURRENCY lacos de curl em paralelo, com user_id aleatorio -
+# isso mistura cache HIT e MISS no Redis e, como cada avaliacao publica um
+# evento no SQS, alimenta o backlog que escala o analytics-service em cascata.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+  namespace: togglemaster
+  labels:
+    app: loadgen
+    app.kubernetes.io/name: loadgen
+    app.kubernetes.io/component: demo-tooling
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: loadgen
+  template:
+    metadata:
+      labels:
+        app: loadgen
+        app.kubernetes.io/name: loadgen
+        app.kubernetes.io/component: demo-tooling
+        app.kubernetes.io/part-of: togglemaster
+    spec:
+      containers:
+        - name: loadgen
+          image: curlimages/curl:8.9.1
+          env:
+            - name: TARGET
+              value: "http://evaluation-service:8004/evaluate"
+            - name: FLAG_NAME
+              value: "enable-new-dashboard"
+            - name: CONCURRENCY
+              value: "20"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              i=0
+              while [ "$i" -lt "$CONCURRENCY" ]; do
+                (
+                  while true; do
+                    curl -s -o /dev/null --max-time 5 \
+                      "$TARGET?user_id=user-$RANDOM&flag_name=$FLAG_NAME" || true
+                  done
+                ) &
+                i=$((i + 1))
+              done
+              wait
+          resources:
+            requests:
+              cpu: 100m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi

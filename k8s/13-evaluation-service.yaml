@@ -1,0 +1,137 @@
+# Etapa 4 - evaluation-service (Go): e o caminho quente do sistema. Resolve a
+# flag para um usuario, usa o ElastiCache como cache e publica um evento no SQS
+# a cada avaliacao. Alvo do HPA da etapa 5 (ver k8s/30-hpa.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: evaluation-service
+  namespace: togglemaster
+  labels:
+    app: evaluation-service
+    app.kubernetes.io/name: evaluation-service
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  # Mesmo valor do minReplicas do HPA, para que o primeiro apply nao brigue
+  # com o autoscaler.
+  replicas: 2
+  selector:
+    matchLabels:
+      app: evaluation-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: evaluation-service
+        app.kubernetes.io/name: evaluation-service
+        app.kubernetes.io/part-of: togglemaster
+    spec:
+      securityContext:
+        # runAsUser explicito e obrigatorio aqui: os Dockerfiles declaram
+        # `USER appuser` (nome, nao numero) e, sem o UID numerico, o kubelet
+        # nao consegue provar que o usuario nao e root -- o pod falharia com
+        # "image has non-numeric user (appuser), cannot verify user is
+        # non-root". 10001 e o UID criado nas 5 imagens.
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: evaluation-service
+          # TROQUE os 12 digitos pelo ID da sua conta AWS.
+          # Obter com: aws sts get-caller-identity --query Account --output text
+          image: "TROQUE-ACCOUNT-ID.dkr.ecr.us-east-1.amazonaws.com/togglemaster/evaluation-service:v1"
+          # Always, e nao IfNotPresent: durante a sessao do lab e comum
+          # republicar a MESMA tag depois de um ajuste, e com IfNotPresent os
+          # nos continuariam servindo a imagem antiga em cache.
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8004
+          env:
+            - name: PORT
+              value: "8004"
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: REDIS_URL
+            - name: FLAG_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: FLAG_SERVICE_URL
+            - name: TARGETING_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: TARGETING_SERVICE_URL
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: AWS_REGION
+            - name: AWS_SQS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: AWS_SQS_URL
+            # Vazio = SQS real da AWS (no compose aponta para o ElasticMQ).
+            - name: AWS_SQS_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: AWS_SQS_ENDPOINT
+            - name: SERVICE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: togglemaster-secrets
+                  key: SERVICE_API_KEY
+          # requests.cpu deliberadamente baixo: e a base de calculo do HPA por
+          # CPU, e com 100m o alvo de 60% (= 60m) e atingido com carga modesta
+          # no /evaluate, o que torna o scale out demonstravel no video.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 48Mi
+            limits:
+              cpu: 500m
+              memory: 192Mi
+          startupProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # O /ready checa Redis + flag-service + targeting-service com timeout
+          # proprio; e ele que impede o trafego de cair num pod degradado.
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: evaluation-service
+  namespace: togglemaster
+  labels:
+    app: evaluation-service
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  type: ClusterIP
+  selector:
+    app: evaluation-service
+  ports:
+    - name: http
+      port: 8004
+      targetPort: http

@@ -1,0 +1,127 @@
+# Etapa 4 - analytics-service (Python): worker que consome a fila SQS e grava
+# os eventos de avaliacao no DynamoDB. Nao expoe rota de negocio -- so /health
+# e /ready -- por isso nao aparece no Ingress. Alvo do HPA da etapa 5.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: togglemaster
+  labels:
+    app: analytics-service
+    app.kubernetes.io/name: analytics-service
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+        app.kubernetes.io/name: analytics-service
+        app.kubernetes.io/part-of: togglemaster
+    spec:
+      securityContext:
+        # runAsUser explicito e obrigatorio aqui: os Dockerfiles declaram
+        # `USER appuser` (nome, nao numero) e, sem o UID numerico, o kubelet
+        # nao consegue provar que o usuario nao e root -- o pod falharia com
+        # "image has non-numeric user (appuser), cannot verify user is
+        # non-root". 10001 e o UID criado nas 5 imagens.
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: analytics-service
+          # TROQUE os 12 digitos pelo ID da sua conta AWS.
+          # Obter com: aws sts get-caller-identity --query Account --output text
+          image: "TROQUE-ACCOUNT-ID.dkr.ecr.us-east-1.amazonaws.com/togglemaster/analytics-service:v1"
+          # Always, e nao IfNotPresent: durante a sessao do lab e comum
+          # republicar a MESMA tag depois de um ajuste, e com IfNotPresent os
+          # nos continuariam servindo a imagem antiga em cache.
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8005
+          env:
+            - name: PORT
+              value: "8005"
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: AWS_REGION
+            - name: AWS_SQS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: AWS_SQS_URL
+            - name: AWS_SQS_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: AWS_SQS_ENDPOINT
+            - name: AWS_DYNAMODB_TABLE
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: AWS_DYNAMODB_TABLE
+            - name: AWS_DYNAMODB_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: togglemaster-config
+                  key: AWS_DYNAMODB_ENDPOINT
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 400m
+              memory: 256Mi
+          # O primeiro poll do SQS usa long polling de 20s, entao a readiness
+          # so passa depois disso: 12 x 5s = 60s de folga na partida.
+          startupProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 5
+            failureThreshold: 12
+          # Liveness olha a thread do worker: se ela morreu, o processo segue
+          # respondendo HTTP mas nao consome mais a fila -- e aqui o restart
+          # resolve de verdade.
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Readiness: thread viva E com poll bem-sucedido nos ultimos 90s.
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+# Service ClusterIP mesmo sem rota de negocio: e por ele que as probes
+# agregadas, o `kubectl port-forward` e os endpoints do HPA alcancam os pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: togglemaster
+  labels:
+    app: analytics-service
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  type: ClusterIP
+  selector:
+    app: analytics-service
+  ports:
+    - name: http
+      port: 8005
+      targetPort: http

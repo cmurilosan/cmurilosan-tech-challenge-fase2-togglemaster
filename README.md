@@ -122,6 +122,93 @@ docker compose down -v       # apaga também os dados
 
 ---
 
+## Kubernetes (EKS) — etapas 2 a 5
+
+O provisionamento da AWS e a instalação dos add-ons estão no
+**[docs/runbook-aws.md](docs/runbook-aws.md)**, na ordem em que precisam ser
+executados. Os manifestos ficam em `k8s/`:
+
+| Arquivo                     | Objetos                                      | Etapa |
+|-----------------------------|----------------------------------------------|-------|
+| `00-namespace.yaml`         | Namespace `togglemaster`                     | 4     |
+| `01-configmap.yaml`         | ConfigMap com a configuração não sensível    | 4     |
+| `02-secret.yaml`            | Secret com os DSNs do RDS e as chaves        | 4     |
+| `10..14-<serviço>.yaml`     | Deployment + Service ClusterIP dos 5 serviços| 4     |
+| `20-ingress.yaml`           | Ingress único (`ingressClassName: nginx`)    | 4     |
+| `30-hpa.yaml`               | HPA do `evaluation-service` e do `analytics-service` | 5 |
+| `40-loadgen.yaml`           | Gerador de carga da demonstração (`replicas: 0`) | 5 |
+| `90-db-init-job.yaml`       | Job que aplica o schema nas 3 instâncias RDS | 2     |
+
+### Valores que você precisa preencher
+
+O endpoint do RDS, o DNS do ElastiCache, a URL da fila e o ID da conta no ECR
+mudam a cada sessão do AWS Academy. Todo ponto que precisa ser editado está
+marcado com a palavra `TROQUE`, então um comando lista o que falta:
+
+```bash
+grep -rn TROQUE k8s/
+```
+
+São 10 valores, em 7 arquivos:
+
+| Arquivo | O que preencher |
+|---|---|
+| `01-configmap.yaml` | URL da fila SQS, endpoint do ElastiCache |
+| `02-secret.yaml` | senha e os 3 endpoints do RDS, `MASTER_KEY`, `SERVICE_API_KEY` |
+| `10-` a `14-` | o ID da conta AWS na linha `image:` (os 5 serviços) |
+
+O `02-secret.yaml` fica versionado **com os placeholders**, porque o manifesto
+do Secret é um entregável. Os valores reais são preenchidos na hora de aplicar
+e não são commitados; `git checkout k8s/02-secret.yaml` restaura os
+placeholders depois.
+
+### Decisões de projeto dos manifestos
+
+- **Nomes dos Services** são exatamente `auth-service`, `flag-service` e
+  `targeting-service`: as variáveis de comunicação entre serviços já apontam
+  para esses nomes e o CoreDNS as resolve sem nenhuma mudança de código.
+- **`requests.cpu` baixo nos dois alvos do HPA** (100m no `evaluation-service`,
+  50m no `analytics-service`): é a base de cálculo da utilização, e assim o
+  alvo de 60% é atingido com carga modesta — o scale out fica demonstrável.
+- **Probes separadas**: `livenessProbe` no `/health` (só o processo) e
+  `readinessProbe` no `/ready` (dependência alcançável), mais uma
+  `startupProbe` que dá folga na partida. O raciocínio completo está na seção
+  *Health checks e readiness*.
+- **Sem credencial da AWS nos manifestos**: os pods usam a role de instância
+  dos nós (LabRole) via IMDS, que é o padrão do SDK.
+- **O `analytics-service` não aparece no Ingress** porque é um worker de fila,
+  sem API pública. Ele tem Service ClusterIP para as probes e o `port-forward`.
+- **O schema do RDS é aplicado por um Job no cluster**, lendo os mesmos
+  `db/init.sql` que o Compose usa. O RDS não é público e assim não é preciso
+  bastion host. O Job tem de rodar antes de a API ser **usada** (sem a tabela,
+  `/flags` responde 500), mas não antes dos pods: o `/ready` dos serviços faz
+  só um `SELECT 1`, então eles ficam `Ready` tão logo o RDS responda.
+- **O RDS precisa existir antes de aplicar os Deployments**: os serviços Python
+  abrem o pool de conexões no import e chamam `sys.exit(1)` se o banco não
+  responder, o que viraria `CrashLoopBackOff`.
+
+### Validando no cluster
+
+```bash
+BASE_URL=http://<dns-do-elb> MASTER_KEY=<master-key>   bash scripts/cluster-smoke-test.sh
+```
+
+Mesmo fluxo do smoke test local, mas atravessando o Ingress e conferindo os
+eventos no DynamoDB real.
+
+### Demonstrando o HPA
+
+```bash
+kubectl -n togglemaster get hpa -w                        # terminal 1
+kubectl -n togglemaster scale deploy/loadgen --replicas=3 # terminal 2
+```
+
+Cada avaliação no `/evaluate` publica um evento no SQS, então uma única rajada
+de carga escala o `evaluation-service` por CPU direta e o `analytics-service`
+em cascata, ao consumir o backlog.
+
+---
+
 ## Decisões de containerização
 
 - **Multi-stage em todos os 5 Dockerfiles.** Go compila em `golang:1.21-alpine` e
@@ -206,7 +293,9 @@ completa e os valores de produção.
 
 - [x] **Etapa 1** — Dockerfiles multi-stage + `docker-compose.yml` com os 5 serviços e os bancos locais
 - [ ] **Etapa 2** — Infra na AWS (EKS, ECR, 3x RDS, ElastiCache, DynamoDB, SQS)
+      — runbook pronto em [docs/runbook-aws.md](docs/runbook-aws.md); falta executar na sessão do lab
 - [ ] **Etapa 3** — Metrics Server + Nginx Ingress Controller no cluster
-- [ ] **Etapa 4** — Manifestos K8s (Namespace, Deployment, Service, Secret, ConfigMap, Ingress)
-- [ ] **Etapa 5** — HPA do `evaluation-service` e do `analytics-service`
+      — comandos no runbook; falta executar
+- [x] **Etapa 4** — Manifestos K8s (Namespace, Deployment, Service, Secret, ConfigMap, Ingress)
+- [x] **Etapa 5** — HPA do `evaluation-service` e do `analytics-service` + gerador de carga
 - [ ] Vídeo de demonstração + relatório de entrega
