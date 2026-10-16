@@ -148,8 +148,43 @@ aws ec2 describe-instances \
   --query 'Reservations[].Instances[].MetadataOptions.HttpPutResponseHopLimit'
 ```
 
-Esperado: `2`. Se vier `1`, os pods não alcançam o IMDS — use a alternativa da
-seção *Troubleshooting*.
+**Na execucao de 2026-10-16 veio `1`** — ou seja, esperar `2` era otimismo meu:
+o node group do EKS criado por CLI nasce com hop limit 1, e os pods **nao**
+alcancam o IMDS. Sem credencial, o `evaluation-service` nao publica no SQS e o
+`analytics-service` nao le a fila nem grava no DynamoDB.
+
+A correcao, que a role `voclabs` permite, e elevar o hop limit nas instancias
+ja em execucao:
+
+```bash
+IDS=$(aws ec2 describe-instances \
+  --filters "Name=tag:eks:nodegroup-name,Values=ng-togglemaster" \
+            "Name=instance-state-name,Values=running" \
+  --query 'Reservations[].Instances[].InstanceId' --output text)
+
+for id in $IDS; do
+  aws ec2 modify-instance-metadata-options --instance-id "$id" \
+    --http-put-response-hop-limit 2 --http-endpoint enabled
+done
+```
+
+Depois **reinicie os dois servicos que usam AWS**: o SDK guarda em cache a falha
+de credencial, e um pod que subiu antes da correcao nao se recupera sozinho.
+
+```bash
+kubectl -n togglemaster rollout restart deploy/analytics-service deploy/evaluation-service
+```
+
+Confirme com `kubectl -n togglemaster logs -l app=analytics-service`, que deve
+mostrar `Found credentials from IAM Role: LabRole`.
+
+Para testar o IMDS de dentro do cluster antes de aplicar a aplicacao:
+
+```bash
+kubectl run imds-test --rm --attach --restart=Never --image=curlimages/curl:8.9.1 \
+  --command -- sh -c 'curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 60" | head -c 20'
+```
 
 ---
 
@@ -167,7 +202,12 @@ aws ec2 authorize-security-group-ingress \
   --group-id "$RDS_SG" --protocol tcp --port 5432 --cidr "$VPC_CIDR"
 ```
 
-Uma instância por serviço, com o banco já criado por `--db-name`:
+Uma instância por serviço, com o banco já criado por `--db-name`. Sem
+`--engine-version`, pelo mesmo motivo do EKS: o RDS usa a versao default atual
+e o runbook nao envelhece. Na execucao de 2026-10-16 isso deu **PostgreSQL
+18.3**, mais novo que o `postgres:16-alpine` do compose — os drivers (`pgx/v4`
+no Go, `psycopg2` no Python) e o SQL dos `init.sql` funcionaram sem nenhum
+ajuste.
 
 ```bash
 for db in auth flags targeting; do
@@ -333,6 +373,16 @@ kubectl apply -f k8s/00-namespace.yaml
 kubectl apply -f k8s/
 ```
 
+**Se o apply do Ingress falhar** com erro de webhook (`failed calling webhook
+... no endpoints available`), e porque o Nginx instalou um *admission webhook*
+que valida objetos Ingress e os pods dele ainda nao estao prontos. Espere o
+controller e aplique so o Ingress:
+
+```bash
+kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller
+kubectl apply -f k8s/20-ingress.yaml
+```
+
 ### Schema dos bancos
 
 ```bash
@@ -426,9 +476,15 @@ kubectl -n kube-system patch deploy metrics-server --type=json \
   -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
 ```
 
-**Pods em `CrashLoopBackOff` com erro de credencial da AWS** — o IMDS não está
-alcançável (hop limit 1). Alternativa sem IRSA: injetar as credenciais
-temporárias do lab como Secret. Elas **expiram junto com a sessão**:
+**Erro `Unable to locate credentials` nos logs** — o IMDS não está alcançável.
+A correção de primeira linha é elevar o hop limit, na seção *Checar o IMDS* do
+passo 3. Use o Secret abaixo **apenas** se a conta não permitir
+`ec2:ModifyInstanceMetadataOptions`, porque estas credenciais **expiram junto
+com a sessão** do lab:
+
+Observação: o pod não entra em `CrashLoopBackOff` por isso. Ele fica `Running`
+mas `0/1`, com o `/ready` em 503 — é o readiness tirando o pod do Service sem
+reiniciá-lo, que é o comportamento desejado.
 
 ```bash
 kubectl -n togglemaster create secret generic aws-lab-creds \
