@@ -21,3 +21,12 @@ Thumbs.db
 
 # Credenciais
 *.pem
+
+# Valores da sessao do AWS Academy (efemeros)
+.lab-session.env
+
+# Credenciais da AWS salvas por engano dentro do projeto (ex.: "Salvar como"
+# do Notepad caindo no diretorio de trabalho em vez de ~/.aws/)
+credentials
+credentials.txt
+**/credentials
