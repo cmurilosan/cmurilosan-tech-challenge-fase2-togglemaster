@@ -97,13 +97,25 @@ provisionamento inteiro caber em ~25 min em vez de 50.
 ```bash
 aws eks create-cluster \
   --name "$CLUSTER_NAME" \
-  --kubernetes-version 1.31 \
   --role-arn "$LAB_ROLE_ARN" \
   --resources-vpc-config subnetIds="$SUBNET_CSV",endpointPublicAccess=true
 
 aws eks wait cluster-active --name "$CLUSTER_NAME"
 aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"
 kubectl get nodes          # ainda vazio: o node group vem agora
+```
+
+**Sem `--kubernetes-version` de proposito:** o EKS usa a versao default, que e a
+mais recente em suporte padrao. Fixar uma versao aqui envelhece o runbook — uma
+versao antiga cai em suporte estendido (mais caro) ou deixa de ser aceita para
+clusters novos. Deixando a default, a versao do cluster tambem fica perto da do
+seu `kubectl` (veja com `kubectl version --client`), o que evita problemas de
+compatibilidade entre cliente e servidor.
+
+Para ver as versoes disponiveis antes, se quiser conferir:
+
+```bash
+aws eks describe-cluster-versions --query 'clusterVersions[].clusterVersion' --output table
 ```
 
 ```bash
@@ -262,7 +274,7 @@ mensagens ser gravado no DynamoDB antes de voltar para a fila.
 Sem ele o HPA fica com `<unknown>` em `TARGETS` e nunca escala.
 
 ```bash
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.7.2/components.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.0/components.yaml
 kubectl -n kube-system rollout status deploy/metrics-server
 
 kubectl top nodes        # tem de retornar CPU/memoria
@@ -273,8 +285,18 @@ kubectl top nodes        # tem de retornar CPU/memoria
 O manifesto do provider `aws` cria um Service `LoadBalancer` que provisiona um
 NLB (leva ~3 min para o DNS responder).
 
+As versoes do Metrics Server e do Nginx ficam fixadas de proposito: `latest`
+poderia trazer uma mudanca de comportamento no meio da gravacao. Confira se
+ainda sao as atuais em <https://kubernetes.github.io/ingress-nginx/deploy/> e
+<https://github.com/kubernetes-sigs/metrics-server/releases>.
+
+A documentacao do ingress-nginx observa que a AWS recomenda o *AWS Load Balancer
+Controller* em vez deste manifesto, que usa o provisionamento legado de NLB.
+Aqui ele e a escolha certa mesmo assim: o Load Balancer Controller precisa de
+IRSA, que exige criar uma IAM Role — impossivel no AWS Academy.
+
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/aws/deploy.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/aws/deploy.yaml
 kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller
 
 export INGRESS_HOST=$(kubectl -n ingress-nginx get svc ingress-nginx-controller \
@@ -444,7 +466,7 @@ Kubernetes e, se o cluster for removido primeiro, o load balancer fica órfão.
 
 ```bash
 kubectl delete -f k8s/ --ignore-not-found
-kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/aws/deploy.yaml
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/aws/deploy.yaml
 
 aws eks delete-nodegroup --cluster-name "$CLUSTER_NAME" --nodegroup-name ng-togglemaster
 aws eks wait nodegroup-deleted --cluster-name "$CLUSTER_NAME" --nodegroup-name ng-togglemaster
