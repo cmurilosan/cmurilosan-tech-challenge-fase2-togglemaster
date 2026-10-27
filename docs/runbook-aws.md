@@ -214,7 +214,7 @@ for db in auth flags targeting; do
   aws rds create-db-instance \
     --db-instance-identifier "togglemaster-${db}" \
     --db-name "${db}_db" \
-    --engine postgres --engine-version 16.4 \
+    --engine postgres \
     --db-instance-class db.t3.micro --allocated-storage 20 \
     --master-username togglemaster --master-user-password "$PG_PASSWORD" \
     --vpc-security-group-ids "$RDS_SG" \
@@ -455,6 +455,31 @@ aws sqs get-queue-attributes --queue-url "$QUEUE_URL" \
   --attribute-names ApproximateNumberOfMessages
 
 aws dynamodb scan --table-name ToggleMasterAnalytics --select COUNT --query Count
+```
+
+### Envio manual de mensagens para o SQS
+
+Entregável do vídeo listado **separadamente** da carga no `/evaluate`: aqui as
+mensagens vão direto para a fila pela AWS CLI, sem passar pela aplicação, e o
+`analytics-service` escala só por causa do backlog que elas criam.
+
+```bash
+bash scripts/sqs-send-manual.sh            # 90 s, 6 remetentes em paralelo
+```
+
+O corpo precisa ter exatamente as 4 chaves que o `analytics-service` lê em
+`process_message` (`user_id`, `flag_name`, `result`, `timestamp`), e `result`
+tem de ser booleano JSON — faltando uma chave, o `put_item` nunca acontece, a
+mensagem não é apagada da fila e vira uma *poison pill* girando para sempre.
+
+O script usa `flag_name: manual-sqs-demo` de propósito, para que esses eventos
+fiquem distinguíveis dos que vieram do `/evaluate`:
+
+```bash
+aws dynamodb scan --table-name ToggleMasterAnalytics --select COUNT \
+  --filter-expression 'flag_name = :f' \
+  --expression-attribute-values '{":f":{"S":"manual-sqs-demo"}}' \
+  --query Count
 ```
 
 Desligar a carga e mostrar o scale in (janela de estabilização de 120 s):

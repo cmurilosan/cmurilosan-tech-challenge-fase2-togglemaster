@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Roteiro do Video - Tech Challenge Fase 2</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root {
+  --ink: #1C2430; --muted: #5B6472; --border: #D7DCE3;
+  --accent: #1E6E8C; --accent-soft: #E8F2F6;
+  --fala: #FBF7EE; --fala-edge: #C9A227;
+  --code-bg: #F2F5F8;
+}
+* { box-sizing: border-box; }
+body {
+  color: var(--ink); background: #fff;
+  font-family: "IBM Plex Sans", system-ui, "Segoe UI", sans-serif;
+  font-size: 10.5pt; line-height: 1.55; margin: 0;
+}
+.page { max-width: 820px; margin: 0 auto; padding: 0 18px 40px; }
+header.hero {
+  border-bottom: 2.5px solid var(--ink);
+  padding-bottom: 16px; margin-bottom: 26px;
+}
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  font-size: 8.5pt; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--accent); font-weight: 600; display: block; margin-bottom: 8px;
+}
+h1 { font-size: 23pt; font-weight: 600; letter-spacing: -.01em; margin: 0 0 10px; }
+.meta { font-size: 9.5pt; color: var(--muted); }
+.meta strong { color: var(--ink); }
+
+h1.sec, h2 {
+  font-size: 14pt; font-weight: 600; margin: 30px 0 12px;
+  padding-bottom: 6px; border-bottom: 1.5px solid var(--border);
+  page-break-after: avoid; break-after: avoid;
+}
+h3 {
+  font-size: 11.5pt; font-weight: 600; margin: 20px 0 8px; color: var(--accent);
+  page-break-after: avoid; break-after: avoid;
+}
+p { margin: 0 0 10px; }
+hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+ul, ol { margin: 0 0 10px; padding-left: 22px; }
+li { margin-bottom: 4px; }
+strong { font-weight: 600; }
+
+code {
+  font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  font-size: 9pt; background: var(--code-bg);
+  padding: 1px 4px; border-radius: 3px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  padding: 10px 12px; border-radius: 4px; margin: 0 0 12px;
+  overflow-x: auto; page-break-inside: avoid; break-inside: avoid;
+}
+pre code { background: none; padding: 0; font-size: 8.8pt; line-height: 1.45; }
+
+blockquote {
+  margin: 0 0 12px; padding: 10px 14px;
+  background: var(--fala); border-left: 3px solid var(--fala-edge);
+  border-radius: 0 4px 4px 0;
+}
+blockquote p { margin: 0 0 8px; }
+blockquote p:last-child { margin-bottom: 0; }
+blockquote em { color: #8A6D1F; font-style: italic; }
+
+table {
+  width: 100%; border-collapse: collapse; margin: 0 0 14px; font-size: 9.5pt;
+  page-break-inside: avoid; break-inside: avoid;
+}
+th {
+  text-align: left; background: var(--accent-soft); color: var(--ink);
+  font-weight: 600; padding: 6px 9px; border: 1px solid var(--border);
+}
+td { padding: 6px 9px; border: 1px solid var(--border); vertical-align: top; }
+
+.exigido {
+  display: inline-block; background: var(--accent); color: #fff;
+  font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  font-size: 7.5pt; font-weight: 600; letter-spacing: .07em;
+  padding: 2px 7px; border-radius: 3px; vertical-align: 1px;
+}
+
+@page { size: A4; margin: 15mm 13mm 16mm; }
+@media print {
+  .page { max-width: none; padding: 0; }
+  a { color: var(--ink); text-decoration: none; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="hero">
+  <span class="eyebrow">P&oacute;s-Tech DevOps &middot; Tech Challenge Fase 2</span>
+  <h1>Roteiro do V&iacute;deo de Entrega</h1>
+  <div class="meta">
+    <strong>Projeto:</strong> ToggleMaster em microsservi&ccedil;os no AWS EKS &nbsp;&middot;&nbsp;
+    <strong>Dura&ccedil;&atilde;o alvo:</strong> 18 a 19 min (limite de 20) &nbsp;&middot;&nbsp;
+    <strong>Cássio Murilo dos Santos</strong>
+  </div>
+</header>
+<p><strong>Projeto:</strong> ToggleMaster em microsserviços no AWS EKS
+<strong>Duração alvo:</strong> 18 a 19 minutos (o limite do enunciado é 20)</p>
+<p>As falas abaixo são um ponto de partida. Fale com as suas palavras — o que
+importa é cobrir os pontos, não decorar o texto. Os 11 itens que o enunciado
+exige do vídeo estão todos marcados no roteiro com o selo <strong><span class="exigido">EXIGIDO</span></strong>.</p>
+<hr />
+<h2>Bloco 0 — Preparação (ANTES de ligar a gravação)</h2>
+<p>O provisionamento leva uns 25 minutos e <strong>não cabe</strong> nos 20 minutos de vídeo.
+Faça tudo isto com a gravação desligada, na mesma sessão do laboratório.</p>
+<h3>0.1 Limpar as sobras da sessão anterior</h3>
+<p>A limpeza do dia 16/10 foi interrompida quando o token do lab expirou. Pode ter
+ficado um cluster EKS de pé consumindo orçamento. <strong>Primeira coisa ao abrir o
+lab:</strong></p>
+<pre><code class="language-bash">aws eks list-clusters
+aws rds describe-db-instances --query 'DBInstances[].DBInstanceIdentifier'
+aws elasticache describe-cache-clusters --query 'CacheClusters[].CacheClusterId'
+</code></pre>
+<p>Se aparecer o cluster <code>togglemaster</code> antigo, apague e espere, porque o nome
+precisa estar livre para o cluster novo:</p>
+<pre><code class="language-bash">aws eks delete-nodegroup --cluster-name togglemaster --nodegroup-name ng-togglemaster
+aws eks wait nodegroup-deleted --cluster-name togglemaster --nodegroup-name ng-togglemaster
+aws eks delete-cluster --name togglemaster
+aws eks wait cluster-deleted --name togglemaster
+</code></pre>
+<p>Confira também o orçamento consumido no painel do Academy antes de começar.</p>
+<h3>0.2 Provisionar tudo</h3>
+<p>Siga o <code>docs/runbook-aws.md</code> do passo 0 ao 9. Resumo do que tem de estar de pé
+antes de gravar:</p>
+<table>
+<thead>
+<tr>
+<th>Etapa</th>
+<th>O que fica pronto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Runbook 2</td>
+<td>5 repositórios no ECR com as imagens <code>v1</code> publicadas</td>
+</tr>
+<tr>
+<td>Runbook 3</td>
+<td>Cluster EKS + node group de 2 nós, <strong>e o hop limit do IMDS em 2</strong></td>
+</tr>
+<tr>
+<td>Runbook 4-7</td>
+<td>3 RDS, 1 ElastiCache, 1 tabela DynamoDB, 1 fila SQS</td>
+</tr>
+<tr>
+<td>Runbook 8</td>
+<td>Metrics Server e Nginx Ingress Controller em <code>1/1</code></td>
+</tr>
+<tr>
+<td>Runbook 9</td>
+<td>Manifestos aplicados, Job do schema concluído, smoke test 5/5</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Não esqueça o hop limit do IMDS.</strong> É o erro que mais custou tempo na
+primeira execução: o node group nasce com hop limit 1 e os pods não
+conseguem credencial da AWS. Está documentado no passo 3 do runbook.</p>
+</blockquote>
+<p>Ao fim do smoke test, cole a <code>SERVICE_API_KEY</code> que ele imprime no
+<code>k8s/02-secret.yaml</code>, aplique de novo e reinicie o <code>evaluation-service</code>.
+Guarde essas duas variáveis à mão para a gravação:</p>
+<pre><code class="language-bash">export INGRESS_HOST=$(kubectl -n ingress-nginx get svc ingress-nginx-controller \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+export API_KEY='&lt;a chave que o smoke test imprimiu&gt;'
+export QUEUE_URL=$(aws sqs get-queue-url --queue-name togglemaster-events --output text)
+echo &quot;http://$INGRESS_HOST&quot;
+</code></pre>
+<h3>0.3 Subir o ambiente local</h3>
+<p>O primeiro item do vídeo é o <code>docker compose</code>. Suba antes para não gravar os
+minutos de build:</p>
+<pre><code class="language-bash">docker compose up -d
+docker compose ps        # tem de listar 9 contêineres de pé
+</code></pre>
+<p>O <code>dynamodb-init</code> aparece como <code>Exited (0)</code> — é um job que cria a tabela e
+encerra, está correto.</p>
+<h3>0.4 Deixar as janelas abertas</h3>
+<table>
+<thead>
+<tr>
+<th>Janela</th>
+<th>Conteúdo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Terminal 1</td>
+<td>onde você digita os comandos (o protagonista)</td>
+</tr>
+<tr>
+<td>Terminal 2</td>
+<td><code>kubectl -n togglemaster get hpa -w</code> já rodando</td>
+</tr>
+<tr>
+<td>Terminal 3</td>
+<td>para ligar a carga e rodar o script do SQS</td>
+</tr>
+<tr>
+<td>Navegador aba 1</td>
+<td>Console AWS → EKS → cluster <code>togglemaster</code></td>
+</tr>
+<tr>
+<td>Navegador aba 2</td>
+<td>Console AWS → RDS → lista de instâncias</td>
+</tr>
+<tr>
+<td>Navegador aba 3</td>
+<td>Console AWS → DynamoDB → <code>ToggleMasterAnalytics</code> → Explore items</td>
+</tr>
+<tr>
+<td>Navegador aba 4</td>
+<td>Console AWS → SQS → <code>togglemaster-events</code></td>
+</tr>
+<tr>
+<td>Navegador aba 5</td>
+<td>o diagrama da arquitetura</td>
+</tr>
+<tr>
+<td>Editor</td>
+<td>VS Code aberto na pasta <code>k8s/</code></td>
+</tr>
+</tbody>
+</table>
+<h3>0.5 Teste de gravação</h3>
+<p>Grave 30 segundos, assista, confirme que o áudio está bom e que a fonte do
+terminal está grande o suficiente para ler no vídeo.</p>
+<hr />
+<h1>AGORA SIM: ligue a gravação</h1>
+<hr />
+<h2>1. Abertura — 0:00 a 1:00</h2>
+<p><strong>O que mostrar:</strong> seu rosto, ou um slide com o título.</p>
+<blockquote>
+<p>Oi, pessoal. Meu nome é Cássio Murilo dos Santos, sou aluno da pós-graduação
+em DevOps da Pós-Tech, e esse vídeo é a entrega da Fase 2 do Tech Challenge.</p>
+<p>Na Fase 1 eu peguei o ToggleMaster, que é uma API de feature flags, e coloquei
+no ar como um monólito numa instância EC2. Agora na Fase 2 a história é outra:
+a aplicação foi quebrada em cinco microsserviços, e meu trabalho foi
+containerizar cada um deles, provisionar a infraestrutura na AWS e colocar
+tudo rodando num cluster Kubernetes, o EKS, com escalabilidade automática.</p>
+<p>Vou mostrar primeiro a arquitetura, depois o ambiente local rodando no Docker
+Compose, aí a infraestrutura de verdade na AWS, a aplicação funcionando pelo
+Ingress, e no final a parte que eu achei mais legal: os pods se multiplicando
+sozinhos quando a carga aumenta. No fechamento eu conto os perrengues.</p>
+</blockquote>
+<hr />
+<h2>2. Arquitetura e os três bancos — 1:00 a 3:30</h2>
+<p><strong><span class="exigido">EXIGIDO</span></strong> <em>"Explique a arquitetura implementada e os desafios."</em>
+<strong><span class="exigido">EXIGIDO</span></strong> <em>"Explique a diferença de propósito entre RDS, ElastiCache e DynamoDB."</em></p>
+<p><strong>O que mostrar:</strong> o diagrama da arquitetura.</p>
+<blockquote>
+<p>Deixa eu começar explicando o desenho. São cinco microsserviços, e cada um
+tem uma responsabilidade só.</p>
+<p>O <strong>auth-service</strong> cuida das chaves de API: ele emite e valida. O
+<strong>flag-service</strong> é o CRUD das feature flags. O <strong>targeting-service</strong> guarda as
+regras de segmentação, por exemplo "libera essa funcionalidade para cinquenta
+por cento dos usuários". O <strong>evaluation-service</strong> é o coração: ele recebe um
+usuário e uma flag e responde verdadeiro ou falso — e para isso ele conversa
+com os outros serviços. E o <strong>analytics-service</strong> é diferente dos quatro: ele
+não tem API pública nenhuma, é um trabalhador de fila, que fica escutando o
+SQS e gravando os eventos.</p>
+<p>Agora, uma coisa que eu quero destacar, porque foi uma decisão de projeto:
+esse sistema usa <strong>três tipos diferentes de banco de dados</strong>, e não é
+exagero, cada um resolve um problema que o outro não resolveria bem.</p>
+<p>O <strong>RDS</strong>, que é PostgreSQL, é banco relacional e guarda a verdade do
+sistema: as chaves, as flags, as regras. É dado que precisa de consistência,
+de transação, de relacionamento entre tabelas. E repara que eu não usei um
+RDS só: são <strong>três instâncias separadas</strong>, uma por serviço. Isso é de
+propósito, é o princípio de banco por serviço — se os cinco
+compartilhassem uma base, eles não seriam de verdade independentes, e uma
+mudança de tabela quebraria todos de uma vez.</p>
+<p>O <strong>ElastiCache</strong>, que é Redis, é cache em memória. A avaliação de flag é a
+rota mais chamada do sistema inteiro, e seria um desperdício ir ao banco toda
+vez para uma resposta que é quase sempre a mesma. O Redis responde em
+microssegundos e tira essa carga do Postgres. É dado descartável: se o cache
+cair, o sistema continua funcionando, só fica mais lento.</p>
+<p>E o <strong>DynamoDB</strong>, que é NoSQL, guarda os eventos de analytics. Aqui o perfil é
+completamente diferente: é muita escrita, sem relacionamento, e o volume
+cresce sem parar. Um banco relacional sofreria com isso. O DynamoDB escala
+escrita horizontalmente e eu paguei por requisição, no modo on-demand.</p>
+<p>Fechando o fluxo: quando chega uma avaliação no evaluation-service, ele
+consulta o cache, se precisar consulta os outros serviços, responde para o
+cliente, e <strong>publica um evento no SQS</strong>. A resposta não espera a gravação do
+analytics — é assíncrono. Lá na frente o analytics-service consome a fila no
+seu próprio ritmo e grava no DynamoDB. Isso desacopla o caminho rápido do
+caminho de escrita pesada, e é justamente o que vai me permitir escalar os
+dois de forma independente.</p>
+</blockquote>
+<hr />
+<h2>3. Conteinerização e o ambiente local — 3:30 a 5:30</h2>
+<p><strong><span class="exigido">EXIGIDO</span></strong> <em>"Mostre o <code>docker compose up</code> com os 9 contêineres rodando."</em></p>
+<p><strong>O que mostrar:</strong> um Dockerfile no editor, depois o terminal.</p>
+<blockquote>
+<p>Antes de ir para a nuvem, a conteinerização. Cada um dos cinco serviços tem
+o seu próprio Dockerfile, e todos usam <strong>multi-stage build</strong>. Deixa eu abrir
+um aqui para explicar o que isso significa.</p>
+<p>A ideia é que a construção tem dois estágios. No primeiro eu uso uma imagem
+cheia de ferramentas, com o compilador, as bibliotecas de desenvolvimento,
+tudo. No segundo estágio eu começo de uma imagem mínima e copio só o
+resultado pronto. O compilador não vai para a imagem final.</p>
+<p>E a diferença é brutal: os dois serviços escritos em Go ficaram com imagens
+de <strong>sete megabytes</strong>. Sete. Os de Python ficaram em torno de sessenta e
+cinco, porque o interpretador tem que ir junto. Imagem pequena sobe mais
+rápido, gasta menos rede e tem menos coisa instalada para dar problema de
+segurança.</p>
+<p>Agora o ambiente local. Eu tenho um Docker Compose na raiz que sobe o sistema
+inteiro na minha máquina, sem AWS nenhuma.</p>
+</blockquote>
+<pre><code class="language-bash">docker compose ps
+</code></pre>
+<blockquote>
+<p>Olha aqui: são nove contêineres. Os cinco microsserviços, e mais quatro
+bancos locais — dois Postgres, um Redis e o DynamoDB Local.</p>
+<p>Tem dois contêineres a mais aí que eu preciso explicar, porque não estavam na
+lista do enunciado e foram escolha minha. Esse <strong>elasticmq</strong> é um emulador de
+SQS: a AWS não tem fila para rodar local, e sem ele o fluxo assíncrono
+simplesmente não funcionaria na minha máquina. E esse <strong>dynamodb-init</strong> é um
+serviço de vida curta, que só cria a tabela no DynamoDB Local e encerra — é
+por isso que ele aparece como "Exited", não é um contêiner com problema.</p>
+<p>O detalhe que eu acho mais bonito disso: do compose para o Kubernetes eu <strong>não
+mudei uma linha de código da aplicação</strong>. O que muda é só a configuração.
+Local, a variável do SQS aponta para o ElasticMQ; na AWS, ela fica vazia, e
+aí o SDK usa o endpoint real da Amazon.</p>
+</blockquote>
+<hr />
+<h2>4. A infraestrutura na AWS — 5:30 a 8:00</h2>
+<p><strong><span class="exigido">EXIGIDO</span></strong> <em>"Mostre o cluster Kubernetes provisionado na nuvem."</em>
+<strong><span class="exigido">EXIGIDO</span></strong> <em>"Explique os desafios, por exemplo as limitações da LabRole."</em></p>
+<p><strong>O que mostrar:</strong> console da AWS, passando pelas abas já abertas.</p>
+<blockquote>
+<p>Vamos para a nuvem de verdade. Aqui é o console da AWS.</p>
+<p>Esse é o <strong>cluster EKS</strong>, chamado togglemaster, status Active. O EKS é o
+Kubernetes gerenciado da Amazon: ela cuida do painel de controle e eu cuido
+dos nós. E aqui está o <strong>node group</strong>, que são as máquinas onde os meus
+contêineres rodam de fato: duas instâncias t3.medium, com escala automática
+configurada de mínimo dois até máximo quatro.</p>
+<p>Aqui nos <strong>repositórios do ECR</strong> estão as cinco imagens que eu construí e
+publiquei, uma por serviço. O EKS puxa as imagens daqui.</p>
+<p>No <strong>RDS</strong>, as três instâncias PostgreSQL, uma para cada serviço que precisa
+de banco relacional, todas privadas, sem acesso pela internet. Esse aqui é o
+<strong>ElastiCache</strong> com o Redis. Essa é a tabela do <strong>DynamoDB</strong>. E essa é a fila
+<strong>SQS</strong>, do tipo Standard.</p>
+<p>Agora, uma limitação importante do ambiente e que mudou decisões minhas de
+arquitetura. Eu estou no AWS Academy, que é o laboratório do curso, e nele eu
+<strong>não tenho permissão de criar IAM Roles</strong>. Tem uma role pronta, a
+<strong>LabRole</strong>, e é obrigatório usar ela — foi o que eu fiz, tanto no cluster
+quanto no node group.</p>
+<p>Isso parece um detalhe burocrático, mas tem consequência prática em cascata.
+Sem poder criar role, eu não tenho o IRSA, que é o mecanismo que dá uma
+identidade da AWS para cada pod individualmente. E sem IRSA, duas ferramentas
+que seriam a escolha natural ficam fora: o <strong>KEDA</strong>, que escalaria o
+analytics olhando direto o tamanho da fila, e o <strong>Karpenter</strong>, que escalaria
+os nós. Eu volto nisso quando falar de escalabilidade.</p>
+<p>Ah, e tem uma decisão que eu quero declarar abertamente: eu criei o cluster
+pela <strong>AWS CLI</strong>, com o comando <code>aws eks create-cluster</code>, e não clicando no
+console. O enunciado pedia o console e proibia o <code>eksctl</code> — e o <code>eksctl</code> eu
+não usei, justamente porque ele tenta criar IAM Roles e aqui isso não é
+permitido. A CLI é provisionamento manual igual ao console, comando por
+comando, com a LabRole como exigido, e com a vantagem de ficar registrado e
+reproduzível no runbook que eu escrevi.</p>
+</blockquote>
+<hr />
+<h2>5. O cluster por dentro: os manifestos — 8:00 a 11:00</h2>
+<p><strong><span class="exigido">EXIGIDO</span></strong> <em>"Mostre os 5 microsserviços rodando como Pods."</em>
+<strong><span class="exigido">EXIGIDO</span></strong> (Requisito 3) Metrics Server e Nginx Ingress Controller instalados.</p>
+<p><strong>O que mostrar:</strong> terminal, e o VS Code na pasta <code>k8s/</code>.</p>
+<pre><code class="language-bash">kubectl get nodes
+kubectl -n togglemaster get pods
+</code></pre>
+<blockquote>
+<p>Agora vamos por dentro do cluster. Esses são os dois nós, prontos. E aqui
+estão os pods: os cinco microsserviços rodando. Repara que os quatro
+primeiros têm duas réplicas cada, e o analytics tem uma só — ele vai crescer
+sozinho depois, quando eu der carga.</p>
+<p>Reparem também que tudo está dentro de um <strong>namespace</strong> chamado togglemaster.
+Namespace é como uma pasta lógica dentro do cluster: isola os meus recursos
+dos add-ons da infraestrutura, que ficam em outros namespaces.</p>
+</blockquote>
+<pre><code class="language-bash">kubectl -n togglemaster get svc,ingress,hpa
+</code></pre>
+<blockquote>
+<p>Aqui estão os <strong>Services</strong>, todos do tipo ClusterIP. ClusterIP significa que
+eles só existem dentro do cluster, não são expostos para fora. E eles fazem
+duas coisas: dão um nome de DNS fixo e distribuem a carga entre as réplicas.
+Isso é o que faz os serviços se acharem — quando o evaluation chama
+<code>http://auth-service:8001</code>, quem resolve esse nome é o DNS do cluster, e ele
+entrega para qualquer um dos pods que estiver saudável.</p>
+<p>E esse é o <strong>Ingress</strong>, que é a única porta de entrada pública, com o endereço
+do load balancer. Já volto nele.</p>
+</blockquote>
+<p>Agora abra a pasta <code>k8s/</code> no editor e passe pelos arquivos.</p>
+<blockquote>
+<p>Deixa eu mostrar os manifestos, porque é aí que está o trabalho.</p>
+<p>Esse é o <strong>ConfigMap</strong>, que é onde fica a configuração que não é secreta: a
+região da AWS, o nome da tabela, a URL da fila, e as URLs internas dos
+serviços.</p>
+<p>E esse é o <strong>Secret</strong>, que guarda o que é sensível: as senhas e os endereços
+dos bancos, e as chaves da aplicação. Deixa eu mostrar como ele fica dentro
+do cluster:</p>
+</blockquote>
+<pre><code class="language-bash">kubectl -n togglemaster get secret togglemaster-secrets -o yaml
+</code></pre>
+<blockquote>
+<p>Olha isso: os valores aparecem nesse formato embaralhado, que é <strong>base64</strong> —
+era o que o enunciado pedia. Mas aqui eu quero ser honesto sobre uma coisa
+que eu aprendi na aula: <strong>base64 não é criptografia</strong>. É só codificação.
+Qualquer pessoa decodifica isso em um comando, não tem senha nenhuma
+protegendo. O que o Secret resolve de verdade é não deixar a senha espalhada
+pelos manifestos e no histórico do Git, e permitir controlar quem tem acesso
+a ele. Proteção de verdade seria criptografia no etcd ou o AWS Secrets
+Manager, que eu não usei aqui porque está fora do escopo da fase.</p>
+<p>Agora, dentro do manifesto de cada serviço, duas coisas que eu quero mostrar.</p>
+<p>A primeira são os <strong>requests e limits</strong>. O request é quanto o pod reserva: é
+com esse número que o Kubernetes decide em qual nó ele cabe. O limit é o teto
+que ele não pode passar. Se faltar request, o Kubernetes empilha pods demais
+num nó e tudo fica lento; se faltar limit, um pod com problema come a máquina
+inteira e derruba os vizinhos. Eu coloquei nos cinco serviços.</p>
+<p>A segunda são as <strong>probes</strong>, e aqui tem uma diferença que eu achei a parte
+mais interessante de aprender. Eu uso três tipos. A <strong>startupProbe</strong> dá um
+tempo para o pod iniciar sem ser julgado. A <strong>livenessProbe</strong> pergunta "você
+está vivo?" — se falhar, o Kubernetes mata e reinicia o pod. E a
+<strong>readinessProbe</strong> pergunta "você está pronto para receber tráfego?" — se
+falhar, ele só tira o pod do balanceamento, sem reiniciar.</p>
+<p>E por que isso importa? Porque a liveness aponta para uma rota que <strong>não
+consulta o banco</strong>, e a readiness aponta para uma que consulta. Se eu
+tivesse colocado o banco na liveness, um soluço no RDS reiniciaria os pods
+de todos os serviços ao mesmo tempo, em cascata, e aí eu transformaria um
+problema pequeno numa queda geral. Com a separação, se o banco oscila, os
+pods saem do balanceamento, esperam, e voltam quando o banco voltar. Sem
+reinício nenhum.</p>
+</blockquote>
+<pre><code class="language-bash">kubectl -n kube-system get deploy metrics-server
+kubectl -n ingress-nginx get pods
+</code></pre>
+<blockquote>
+<p>E esses dois são os add-ons que eu instalei no cluster. O <strong>Metrics Server</strong>
+coleta o consumo de CPU e memória dos pods — sem ele o autoescalamento
+simplesmente não funciona, ele não tem como saber se está na hora de crescer.
+E o <strong>Nginx Ingress Controller</strong>, que é quem transforma o meu manifesto de
+Ingress em roteamento de verdade.</p>
+</blockquote>
+<hr />
+<h2>6. A aplicação funcionando pelo Ingress — 11:00 a 12:30</h2>
+<p><strong><span class="exigido">EXIGIDO</span></strong> <em>"Mostre o Nginx Ingress funcionando (curl para a URL do Load Balancer)."</em></p>
+<p><strong>O que mostrar:</strong> terminal, e o arquivo <code>20-ingress.yaml</code> no editor.</p>
+<blockquote>
+<p>Agora vamos provar que funciona de fora. Esse é o manifesto do Ingress, e
+aqui estão as <strong>regras de roteamento</strong>: tudo que chegar em barra evaluate vai
+para o evaluation-service na porta 8004; barra flags vai para o flag-service;
+barra rules para o targeting; e barra validate e barra admin para o auth.</p>
+<p>Repara que o <strong>analytics não tem rota nenhuma</strong> aqui, e isso é de propósito:
+ele é trabalhador de fila, não tem API pública. Ninguém chama o analytics de
+fora, ele vai buscar trabalho no SQS.</p>
+<p>Quando eu apliquei esse manifesto, o controller do Nginx provisionou um
+<strong>Network Load Balancer</strong> de verdade na AWS. É esse endereço aqui.</p>
+</blockquote>
+<pre><code class="language-bash">echo &quot;http://$INGRESS_HOST&quot;
+curl -i &quot;http://$INGRESS_HOST/flags&quot;
+</code></pre>
+<blockquote>
+<p>Primeiro eu chamo sem credencial nenhuma... e olha: <strong>401, não autorizado</strong>.
+Ótimo, isso é o comportamento certo — a API está protegida, e o mais
+importante, isso prova que o tráfego atravessou o load balancer, entrou no
+Nginx, foi roteado para o flag-service, e o flag-service consultou o
+auth-service para validar. Toda a cadeia funcionou nessa resposta de erro.</p>
+</blockquote>
+<pre><code class="language-bash">curl -s -H &quot;Authorization: Bearer $API_KEY&quot; &quot;http://$INGRESS_HOST/flags&quot;
+</code></pre>
+<blockquote>
+<p>Agora com a chave de API... e aí está a flag que eu criei, com a descrição e o
+status. Essa chave, por sinal, foi emitida pelo próprio auth-service rodando
+no cluster.</p>
+</blockquote>
+<pre><code class="language-bash">curl -s &quot;http://$INGRESS_HOST/evaluate?user_id=video-demo&amp;flag_name=enable-new-dashboard&quot;
+</code></pre>
+<blockquote>
+<p>E essa é a rota principal do sistema: eu pergunto se o usuário "video-demo"
+deve ver a nova funcionalidade... e ele respondeu. Essa única chamada passou
+pelo load balancer, pelo Nginx, pelo evaluation-service, que consultou o
+Redis, o flag-service e o targeting-service, e ainda publicou um evento na
+fila do SQS. Tudo isso nesse milissegundos aí.</p>
+</blockquote>
+<hr />
+<h2>7. Escalabilidade: o evaluation-service sob carga — 12:30 a 15:00</h2>
+<p><strong><span class="exigido">EXIGIDO</span></strong> <em>"Gere carga no evaluation-service e mostre o HPA criando novos Pods."</em></p>
+<p><strong>O que mostrar:</strong> tela dividida — o terminal do <code>get hpa -w</code> e o da carga.</p>
+<blockquote>
+<p>Agora a parte da escalabilidade automática, que é o coração da Fase 2.</p>
+<p>Quem faz isso é o <strong>HPA</strong>, o Horizontal Pod Autoscaler. Ele funciona assim: eu
+digo qual o alvo de uso de CPU, e ele compara o consumo real com o que o pod
+reservou. Eu configurei o alvo em <strong>sessenta por cento</strong>. Quando a média dos
+pods passa disso, ele cria mais réplicas; quando cai, ele reduz.</p>
+<p>Nesse terminal eu estou observando os dois HPAs ao vivo. Repara no estado de
+agora: o evaluation está com duas réplicas, o analytics com uma, e o uso de
+CPU está baixinho, perto de zero, porque ninguém está usando o sistema.</p>
+<p>Vou ligar a carga agora. Eu tenho um gerador de carga preparado como um
+Deployment, que fica com zero réplicas até eu querer. Cada pod dele dispara
+vinte chamadas em paralelo, sem parar, no evaluation-service, com usuários
+aleatórios.</p>
+</blockquote>
+<pre><code class="language-bash">kubectl -n togglemaster scale deploy/loadgen --replicas=3
+</code></pre>
+<blockquote>
+<p>Ligado. Agora é só olhar o HPA.</p>
+<p><em>(espere de 30 a 60 segundos, narrando)</em></p>
+<p>Olha ali, a coluna de CPU começou a subir... passou dos sessenta por cento do
+alvo... e agora o número de réplicas mudou. Ele está criando pods novos.</p>
+<p>Isso aqui não é truque de configuração, é o cluster reagindo. O Metrics
+Server mediu o consumo, o HPA comparou com o alvo, decidiu que precisava de
+mais gente, e o Deployment criou os pods. Os Services já estão mandando
+tráfego para os pods novos assim que eles ficam prontos — e quem decide que
+estão prontos é a readinessProbe que eu mostrei antes.</p>
+</blockquote>
+<pre><code class="language-bash">kubectl -n togglemaster get pods -l app=evaluation-service
+kubectl -n togglemaster top pods
+</code></pre>
+<blockquote>
+<p>Aqui está a lista de pods do evaluation. Dá para ver pela idade deles quais
+são os recém-nascidos. E aqui o consumo real de cada um.</p>
+<p>O que eu achei interessante na primeira vez que rodei isso: ele não vai direto
+no máximo. Ele sobe, mede de novo, e vai parando onde a conta fecha —
+encontra o equilíbrio em que a média volta para perto do alvo. É um laço de
+realimentação, não uma regra fixa.</p>
+</blockquote>
+<hr />
+<h2>8. Escalabilidade em cascata: SQS manual, analytics e DynamoDB — 15:00 a 18:00</h2>
+<p><strong><span class="exigido">EXIGIDO</span></strong> <em>"Envie manualmente várias mensagens para a fila SQS."</em>
+<strong><span class="exigido">EXIGIDO</span></strong> <em>"Mostre o HPA do analytics-service detectando a carga e escalando."</em>
+<strong><span class="exigido">EXIGIDO</span></strong> <em>"Mostre os dados aparecendo na tabela do DynamoDB."</em>
+<strong><span class="exigido">EXIGIDO</span></strong> <em>"Explique e justifique a estratégia de escalabilidade do analytics."</em></p>
+<p><strong>O que mostrar:</strong> terminal do SQS, o <code>get hpa -w</code>, o console do SQS e do DynamoDB.</p>
+<blockquote>
+<p>Agora o outro lado da escalabilidade, e aqui eu quero explicar bem a
+<strong>estratégia</strong>, porque foi uma decisão forçada pelo ambiente.</p>
+<p>O jeito ideal de escalar um trabalhador de fila é olhar <strong>o tamanho da fila</strong>:
+se tem dez mil mensagens esperando, suba mais consumidores. A ferramenta que
+faz isso no Kubernetes é o <strong>KEDA</strong>. E eu não pude usar o KEDA — porque,
+como eu expliquei, ele precisa de uma identidade da AWS por pod, o IRSA, e
+para isso eu teria que criar uma IAM Role, o que o AWS Academy não permite.</p>
+<p>Então eu usei o caminho que o próprio enunciado indica, e que funciona bem
+aqui: escalar o analytics por <strong>CPU</strong>. A lógica é indireta mas sólida: se a
+fila enche, o trabalhador processa mais mensagens, processar mensagem gasta
+CPU, a CPU sobe, e o HPA sobe os pods. Com a fila vazia é o contrário — ele
+fica dormindo esperando mensagem, a CPU cai para perto de zero, e o HPA
+reduz. A CPU funciona como um termômetro do tamanho da fila.</p>
+<p>Agora, no bloco anterior eu enchi a fila <strong>indiretamente</strong>, pela carga no
+evaluate, porque cada avaliação publica um evento. Mas eu quero provar que a
+fila e o consumidor são independentes da aplicação. Então vou mandar
+mensagens <strong>direto para o SQS</strong>, pela linha de comando, sem passar por
+nenhum microsserviço.</p>
+</blockquote>
+<pre><code class="language-bash">kubectl -n togglemaster scale deploy/loadgen --replicas=0   # desliga a carga anterior
+bash scripts/sqs-send-manual.sh
+</code></pre>
+<blockquote>
+<p>Esse script monta lotes de dez mensagens e manda para a fila com a AWS CLI,
+com vários remetentes em paralelo, por noventa segundos. Nada disso toca a
+aplicação — é a fila recebendo mensagem direto de fora.</p>
+<p>E tem um detalhe aí que me deu trabalho e vale contar: o corpo da mensagem
+tem que ter <strong>exatamente</strong> as quatro informações que o analytics espera —
+usuário, nome da flag, resultado e horário. Se faltar uma, o analytics não
+consegue gravar, e como ele só apaga a mensagem da fila <strong>depois</strong> de gravar
+com sucesso, essa mensagem volta para a fila e fica girando para sempre. Isso
+tem até nome: <em>poison pill</em>, pílula envenenada. Eu usei um nome de flag
+diferente nessas mensagens, "manual-sqs-demo", justamente para poder provar
+depois que foram essas que chegaram no banco.</p>
+</blockquote>
+<p>Mostre o console do SQS, aba de monitoramento, e o terminal do HPA.</p>
+<pre><code class="language-bash">aws sqs get-queue-attributes --queue-url &quot;$QUEUE_URL&quot; \
+  --attribute-names ApproximateNumberOfMessages
+</code></pre>
+<blockquote>
+<p>Aqui está a fila com as mensagens acumuladas, esperando. E agora olha o
+terminal do HPA...</p>
+<p><em>(narre o que a tela mostrar)</em></p>
+<p>O analytics estava com uma réplica só. A CPU dele disparou, porque ele está
+consumindo esse monte de mensagem, e o HPA está subindo os pods. Essa é a
+escalabilidade em cascata que eu desenhei: eu não mexi em nada no analytics,
+ele reagiu sozinho ao trabalho que apareceu na fila.</p>
+</blockquote>
+<pre><code class="language-bash">kubectl -n togglemaster logs -l app=analytics-service --tail=15
+</code></pre>
+<blockquote>
+<p>E aqui os logs do analytics, mostrando ele gravando evento por evento no
+DynamoDB.</p>
+</blockquote>
+<p>Agora o console do DynamoDB, em <em>Explore items</em>.</p>
+<pre><code class="language-bash">aws dynamodb scan --table-name ToggleMasterAnalytics --select COUNT --query Count
+
+aws dynamodb scan --table-name ToggleMasterAnalytics --select COUNT \
+  --filter-expression 'flag_name = :f' \
+  --expression-attribute-values '{&quot;:f&quot;:{&quot;S&quot;:&quot;manual-sqs-demo&quot;}}' \
+  --query Count
+</code></pre>
+<blockquote>
+<p>E essa é a prova final do fluxo. Esse é o total de eventos na tabela. E essa
+segunda contagem filtra só pela flag "manual-sqs-demo" — ou seja, são
+exatamente as mensagens que eu mandei na mão para o SQS agora, que o
+analytics consumiu e gravou. O caminho inteiro fechou: fila, trabalhador,
+banco.</p>
+<p>Aqui no console dá para ver os itens de verdade, com o usuário, a flag, o
+resultado e o horário de cada avaliação.</p>
+</blockquote>
+<pre><code class="language-bash">kubectl -n togglemaster get hpa
+</code></pre>
+<blockquote>
+<p>Uma última coisa sobre o HPA: agora que eu parei a carga, ele vai reduzir os
+pods — mas de propósito <strong>devagar</strong>. Eu configurei uma janela de espera de
+dois minutos antes de começar a diminuir. Se ele reduzisse na mesma hora, uma
+carga que vai e volta ficaria criando e destruindo pods sem parar, e isso tem
+nome também: <em>flapping</em>. É melhor pagar um pouco mais de recurso por dois
+minutos do que ficar instável.</p>
+</blockquote>
+<hr />
+<h2>9. Desafios e encerramento — 18:00 a 19:30</h2>
+<p><strong>O que mostrar:</strong> seu rosto, ou a seção de desafios do relatório.</p>
+<blockquote>
+<p>Para fechar, três perrengues de verdade, porque acho que mostram o trabalho
+por trás disso.</p>
+<p>O primeiro, e o que mais me custou tempo, foi o <strong>IMDS</strong>. Os meus pods pegam
+credencial da AWS a partir da role da máquina onde eles rodam, e isso é
+buscado num endereço interno de metadados. O problema é que esse endereço tem
+um limite de "saltos" de rede, e o node group do EKS nasce com esse limite em
+um — o que basta para a máquina, mas não para um contêiner rodando dentro
+dela, que é um salto a mais. O sintoma era confuso: o analytics subia, ficava
+"rodando", mas nunca ficava pronto, e nos logs aparecia "não foi possível
+localizar credenciais". A correção foi aumentar esse limite para dois. E teve
+uma segunda parte: aumentar não resolveu na hora, porque o SDK da AWS guarda
+a falha em cache. Eu tive que reiniciar os pods. Esse é o tipo de coisa que
+você só aprende quebrando.</p>
+<p>O segundo foi um <strong>erro 502</strong> na rota de avaliação. Olhando o log do
+evaluation, ele dizia que o flag-service tinha respondido 401. O motivo era
+bobo e óbvio depois: a chave que o evaluation usa para chamar os outros
+serviços ainda estava com o valor de exemplo no Secret, porque a chave real
+só pode ser emitida depois que o auth-service está no ar. Eu emiti, atualizei
+o Secret... e continuou falhando. Aí aprendi outra: <strong>mudar um Secret não
+reinicia os pods</strong>. Quem já leu a variável de ambiente continua com o valor
+velho. Tive que reiniciar na mão.</p>
+<p>E o terceiro foi o <strong>webhook do Nginx</strong>. Quando eu apliquei todos os
+manifestos de uma vez, o Ingress falhou. É que o Nginx instala um validador
+que confere todo objeto de Ingress antes de aceitar — e os pods dele ainda
+não estavam prontos para validar. A solução foi só ordem: esperar o controller
+e aplicar o Ingress por último.</p>
+<p>Uma surpresa boa para fechar: o RDS me entregou uma versão de PostgreSQL bem
+mais nova do que a que eu uso no ambiente local, e eu já esperava ter que
+ajustar algo. Não precisei mexer em nada — nem nos drivers, nem no SQL. Foi o
+contrário do susto da Fase 1, onde uma versão de Python nova quebrou uma
+biblioteca do projeto.</p>
+<p>Tudo isso, e mais detalhes, está no relatório escrito que acompanha a
+entrega, junto com o link do repositório. Muito obrigado por assistir.</p>
+</blockquote>
+<hr />
+<h2>Depois de parar a gravação</h2>
+<ol>
+<li><strong>Limpe a infraestrutura</strong>, na ordem certa — o Ingress antes do cluster, ou
+   o load balancer fica órfão. A seção <em>Limpeza</em> do runbook tem a sequência.</li>
+<li>Confirme com <code>aws eks list-clusters</code> e <code>aws rds describe-db-instances</code> que
+   não sobrou nada, e <strong>confira o erro de cada comando</strong> — foi exatamente aqui
+   que a limpeza da sessão passada falhou em silêncio.</li>
+<li>Restaure os placeholders dos manifestos antes de commitar:
+   <code>git checkout -- k8s/</code></li>
+<li>Derrube o ambiente local: <code>docker compose down</code></li>
+</ol>
+<hr />
+<h2>Checklist dos 11 itens exigidos do vídeo</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Item do enunciado</th>
+<th>Bloco</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>docker compose up</code> com os 9 contêineres</td>
+<td>3</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Cluster Kubernetes provisionado na nuvem</td>
+<td>4</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Os 5 microsserviços rodando como Pods</td>
+<td>5</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Nginx Ingress funcionando (curl no load balancer)</td>
+<td>6</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Carga no evaluation-service + HPA criando pods</td>
+<td>7</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Envio <strong>manual</strong> de mensagens para o SQS</td>
+<td>8</td>
+</tr>
+<tr>
+<td>7</td>
+<td>HPA do analytics-service escalando</td>
+<td>8</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Dados aparecendo no DynamoDB</td>
+<td>8</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Arquitetura e desafios (limitações da LabRole)</td>
+<td>2, 4 e 9</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Justificativa da estratégia de escalabilidade do analytics</td>
+<td>8</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Diferença de propósito entre RDS, ElastiCache e DynamoDB</td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Dicas práticas</h2>
+<ul>
+<li>Fonte do terminal grande. O avaliador precisa ler.</li>
+<li>Não precisa ser tomada única: errou, para, respira e regrava só o bloco.</li>
+<li>Os blocos 7 e 8 têm espera. Use o tempo para explicar, não fique calado
+  olhando a tela.</li>
+<li>Se um número na sua tela não bater com o que está no roteiro, fale o número
+  da sua tela. Cada execução dá valores diferentes, e isso é normal.</li>
+<li>Fique de olho no relógio: o limite é 20 minutos e o corte costuma ser
+  automático.</li>
+</ul>
+</div>
+</body>
+</html>
