@@ -30,3 +30,13 @@ Thumbs.db
 credentials
 credentials.txt
 **/credentials
+
+# Material de gravacao do video (roteiro de narracao, nao e entregavel do
+# sistema). Os arquivos ficam no disco, fora do repositorio.
+docs/roteiro-video-fase2.md
+docs/roteiro-video-fase2.html
+docs/Roteiro Video - Tech Challenge Fase 2.pdf
+
+# Fonte HTML do diagrama: no repositorio vai o PDF, que o GitHub renderiza na
+# propria pagina (HTML ele mostra como codigo-fonte).
+docs/arquitetura.html
