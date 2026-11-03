@@ -178,6 +178,18 @@ kubectl -n togglemaster rollout restart deploy/analytics-service deploy/evaluati
 Confirme com `kubectl -n togglemaster logs -l app=analytics-service`, que deve
 mostrar `Found credentials from IAM Role: LabRole`.
 
+**Esta correção não é um passo que se faz uma vez.** O
+`modify-instance-metadata-options` age **por instância**, não no *launch
+template* do node group: toda instância nova nasce de novo com hop limit 1.
+Isso acontece sempre que o Auto Scaling substitui um nó — e ele substitui
+quando a sessão do lab fecha e as EC2 são paradas. Ou seja, **no início de
+cada sessão o hop limit volta a 1**, mesmo que você já o tenha corrigido na
+sessão anterior.
+
+Trate como checagem de rotina: rode o `describe-instances` acima no começo de
+toda sessão, e o laço de correção se vier `1`. O
+`bash scripts/provision-aws.sh imds` faz as duas coisas num comando.
+
 Para testar o IMDS de dentro do cluster antes de aplicar a aplicacao:
 
 ```bash
@@ -407,15 +419,27 @@ o Job vem antes do smoke test.
 
 ### Chave de API de serviço
 
+**A ordem aqui importa, e a versão anterior deste runbook a tinha invertida.**
+Ela mandava rodar o smoke test primeiro e só depois gravar a `SERVICE_API_KEY`
+no Secret. **Isso nunca fecha 5/5 numa infra recém-criada:** o passo 4/5 chama
+`/evaluate`, e o `evaluation-service` usa a `SERVICE_API_KEY` do próprio
+ambiente para falar com o `flag-service`. Com o placeholder ele toma `401`, o
+Ingress devolve `502`, e o script aborta — foi exatamente o que aconteceu na
+execução de 2026-11-02.
+
+A ordem correta é emitir a chave **antes** do smoke test. Primeiro emita:
+
 ```bash
-BASE_URL="http://$INGRESS_HOST" MASTER_KEY='<a MASTER_KEY do 02-secret.yaml>' \
-  bash scripts/cluster-smoke-test.sh
+KEY_RESP=$(curl -fsS -X POST "http://${INGRESS_HOST}/admin/keys" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <a MASTER_KEY do 02-secret.yaml>" \
+  -d '{"name":"service-key-eks"}')
+
+SERVICE_API_KEY=$(printf '%s' "$KEY_RESP" \
+  | sed -n 's/.*"key"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 ```
 
-O script emite a chave, cria a flag e a regra, avalia 20 usuários, confere os
-eventos no DynamoDB e imprime `SERVICE_API_KEY=...` no fim. Cole esse valor no
-`SERVICE_API_KEY` do `k8s/02-secret.yaml` e aplique de novo — o
-`evaluation-service` faz rolling update com a chave real:
+Grave no `SERVICE_API_KEY` do `k8s/02-secret.yaml`, aplique, e reinicie:
 
 ```bash
 kubectl apply -f k8s/02-secret.yaml
@@ -425,6 +449,20 @@ kubectl -n togglemaster rollout status deploy/evaluation-service
 
 O `rollout restart` é necessário porque alterar um Secret não reinicia os pods
 que já o leram como variável de ambiente.
+
+**Só então** rode o smoke test, passando a chave no ambiente para que ele reuse
+a existente em vez de emitir outra:
+
+```bash
+BASE_URL="http://$INGRESS_HOST" MASTER_KEY='<a MASTER_KEY do 02-secret.yaml>' \
+  SERVICE_API_KEY="$SERVICE_API_KEY" bash scripts/cluster-smoke-test.sh
+```
+
+O passo 2/5 deve dizer *"usando a SERVICE_API_KEY do ambiente"*. O script cria
+a flag e a regra, avalia 20 usuários e confere os eventos no DynamoDB — 5/5.
+
+O `scripts/provision-aws.sh` já faz tudo isso na ordem certa, sem edição
+manual de manifesto.
 
 ---
 
@@ -521,6 +559,33 @@ for d in evaluation-service analytics-service; do
   kubectl -n togglemaster set env deploy/$d --from=secret/aws-lab-creds
 done
 ```
+
+**Cluster com 0 nós, tudo `Pending`, mas as EC2 aparecem `running`** — o
+bootstrap do nó falhou por um *explicit deny* de SCP, e esse deny é
+**transitório, amarrado à virada de sessão do lab**. Quando a sessão fecha, as
+EC2 são paradas, o Auto Scaling as substitui, e as instâncias que nascem nessa
+janela tomam `403 UnauthorizedOperation` em `ec2:DescribeInstances`. O
+`nodeadm` do AL2023 precisa dessa chamada para se registrar, tenta 8 vezes e
+desiste — o nó nunca entra no cluster. Confirme no console serial:
+
+```bash
+aws ec2 get-console-output --instance-id <id> --output text | grep -i "nodeadm\|Unauthorized"
+```
+
+Não há permissão a ajustar: a SCP vive na organização da AWS Academy e a role
+`voclabs` não a alcança. **A correção é terminar as instâncias travadas e
+deixar o Auto Scaling subir substitutas** — dentro de uma sessão já ativa o
+bootstrap funciona normalmente. Na execução de 2026-11-01 as substitutas
+entraram em ~76 s.
+
+```bash
+aws ec2 terminate-instances --instance-ids <id-1> <id-2>
+aws eks wait nodegroup-active --cluster-name togglemaster --nodegroup-name ng-togglemaster
+kubectl get nodes
+```
+
+Lembre que os nós novos nascem com hop limit 1: rode
+`bash scripts/provision-aws.sh imds` depois.
 
 **Pods `Pending` com `Insufficient cpu`** — o HPA pediu mais do que os 2 nós
 suportam:
