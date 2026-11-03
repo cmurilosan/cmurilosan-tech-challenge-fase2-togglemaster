@@ -23,6 +23,17 @@ FLAG_NAME="${FLAG_NAME:-manual-sqs-demo}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# No Git Bash o mktemp devolve /tmp/tmp.XXXX, que so existe no sistema de
+# arquivos virtual do MSYS. A AWS CLI e um binario nativo do Windows: para ela
+# file:///tmp/... significa C:\tmp\..., que nao existe, e o send-message-batch
+# morre em ParamValidation sem enviar nada. O cygpath -m traduz para
+# C:/Users/.../Temp/tmp.XXXX, forma que os dois lados entendem.
+if command -v cygpath >/dev/null 2>&1; then
+    TMP_CLI="$(cygpath -m "$TMP")"
+else
+    TMP_CLI="$TMP"
+fi
+
 # flag_name proprio de proposito: deixa os eventos manuais distinguiveis dos
 # que vieram do /evaluate quando a gente consultar o DynamoDB depois.
 echo "Fila:     $QUEUE_URL"
@@ -53,12 +64,13 @@ montar_lote() {
 
 remetente() {
     local id="$1" fim="$2" lote=0 arquivo="$TMP/lote-$1.json"
+    local arquivo_cli="$TMP_CLI/lote-$1.json"
     while [ "$(date +%s)" -lt "$fim" ]; do
         lote=$((lote + 1))
         montar_lote "manual-r${id}-l${lote}" "$arquivo"
         aws sqs send-message-batch \
             --queue-url "$QUEUE_URL" \
-            --entries "file://$arquivo" >/dev/null
+            --entries "file://$arquivo_cli" >/dev/null
     done
     echo "  remetente $id: $lote lotes = $((lote * 10)) mensagens"
 }
