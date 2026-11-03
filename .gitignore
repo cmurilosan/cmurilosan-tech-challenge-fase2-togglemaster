@@ -40,3 +40,6 @@ docs/Roteiro Video - Tech Challenge Fase 2.pdf
 # Fonte HTML do diagrama: no repositorio vai o PDF, que o GitHub renderiza na
 # propria pagina (HTML ele mostra como codigo-fonte).
 docs/arquitetura.html
+
+# Fonte HTML do relatorio: no repositorio vai o PDF.
+docs/relatorio-fase2.html
